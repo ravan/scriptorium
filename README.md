@@ -1,22 +1,30 @@
-# Wiki — an agent-maintained knowledge base skill
+# Scriptorium
 
-A [Claude Code](https://claude.com/claude-code) skill that turns a folder of source material into a living, interlinked markdown wiki — and then recomposes that knowledge into blogs, LinkedIn posts, branded slide decks, whitepapers, point-of-view papers and memos (as Markdown, Word or PDF) and SVG images, written in **your** voice and styled by **your** templates.
+You have forty slide decks, a folder of PDFs and a whitepaper you wrote last year. The knowledge is in there. Answering a question means opening the files and reading them again, every time.
 
-You curate sources and ask questions. The agent does everything else: extraction, summarizing, cross-referencing, filing, maintenance and writing.
+Scriptorium is a [Claude Code](https://claude.com/claude-code) skill that reads that material once and compiles it into a markdown wiki the agent maintains. It then writes new work out of the wiki: blog posts, LinkedIn posts, branded slide decks, whitepapers, points of view and memos. Each one renders as Markdown or Word or PDF.
 
-The idea builds on Andrej Karpathy's ["LLM Wiki" pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f#file-llm-wiki-md) (a local copy lives in `docs/kapathy/gist.md`): instead of re-retrieving from raw documents on every question (RAG), the agent **compiles knowledge once** into a persistent wiki and keeps it current. Every source you add and every good question you ask makes the wiki richer. This skill makes that pattern structured and deterministic: fixed layout, tracked ingestion, repeatable scripts.
+You curate sources and ask questions. The agent does the rest: extraction, summarizing, cross-referencing, filing and writing.
 
-## How it works
+A scriptorium was the room where books were read, copied and made. Knowledge in. New documents out.
 
-Every wiki has three layers:
+## Compile the knowledge once instead of re-reading on every question
+
+The pattern comes from Andrej Karpathy's ["LLM Wiki" gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f#file-llm-wiki-md). RAG goes back to the raw documents on every question. A compiled wiki does the understanding once and then keeps it current.
+
+Every source you add makes the wiki richer. Every good answer gets filed back, so the next question starts further along.
+
+This skill makes the pattern deterministic rather than hopeful. Fixed folder layout. Hash-tracked ingestion. Repeatable scripts.
+
+## Three layers, and only one of them is yours to write
 
 | Layer | Who writes it | What it is |
 |---|---|---|
-| `raw/` | You | Your source files, in any subfolders you like. Immutable — the agent never touches them. |
-| `wiki/` | The agent | Interlinked markdown: source summaries, topics, entities, syntheses, an index and a log. |
-| `CLAUDE.md` | The skill | The schema: the rules the agent follows to maintain this wiki. |
+| `raw/` | You | Your source files, in any subfolders you like. Immutable: the agent never touches them. |
+| `wiki/` | The agent | Interlinked markdown. Source summaries, topics, entities, syntheses, an index and a log. |
+| `CLAUDE.md` | The skill | The schema. The rules the agent follows to maintain this wiki. |
 
-Deterministic work lives in **bun + TypeScript scripts** (extraction, manifest tracking, pptx/docx rendering). Judgment work (understanding, synthesis, writing) is the agent's.
+Deterministic work lives in bun and TypeScript scripts: extraction, manifest tracking, pptx and docx rendering. Judgment work stays with the agent: understanding, synthesis and writing.
 
 ```
 my-wiki/
@@ -30,107 +38,176 @@ my-wiki/
   CLAUDE.md               # the schema
 ```
 
-## Getting started
+## Install it with the skills CLI
 
-You do not need to know the command line. The agent runs everything and asks plain yes/no questions before installing anything.
+Use the [Vercel skills CLI](https://github.com/vercel-labs/skills). It reads this repo's `skills/` folder and installs into whichever agent you use: Claude Code, Cursor, Codex, opencode and others.
 
-1. **Install the skill.** Copy (or symlink) `skills/wiki/` into your skills folder, e.g. `~/.claude/skills/wiki`. In this repo it is already linked via `.claude/skills/`.
-2. **Create a wiki.** In Claude Code, say: *"Set up a wiki called Sovereignty Research."* The agent checks tools (bun, poppler, git), asks before installing anything missing, and scaffolds the wiki (default location `~/Wikis/<name>`).
-3. **Add sources.** Drop files into `raw/` — PowerPoint (`.pptx`), PDF, Word (`.docx`), markdown, text, images. Subfolders are fine.
-4. **Ingest.** Say: *"Ingest my sources."* The scripts extract text, speaker notes and embedded images; the agent reads it all, **views every image and describes it**, then writes and cross-links wiki pages. Say *"ingest slowly"* to review each source together before it is filed.
-5. **Ask questions.** *"What do we know about data residency rules?"* Answers cite wiki pages; good answers get filed back so exploration compounds.
-6. **Compose.** *"Write a LinkedIn post about X"*, *"make a slide deck on Y"*, *"write a whitepaper on Z as PDF"*. Outputs land in `outputs/`, written in your voice, checked against your quality bar, styled by a template. Decks are real `.pptx` files that import into Google Slides (File → Import); documents render to `.md`, `.docx` or `.pdf` from one spec.
+```bash
+# everything: wiki + lolly (visual assets) + suse-brand (example brand skill)
+npx skills add ravan/scriptorium
 
-### Your voice and quality profile
+# or with bun
+bunx skills add ravan/scriptorium
+```
 
-Composed outputs are governed by two files in `profile/`:
+Useful variants:
 
-- **`voice.md`** — how you sound: openings, sentence rhythm, kill list of banned words, hard rules.
-- **`quality-and-style.md`** — what "good" means per format: structure, evidence rules, ship checklists.
+```bash
+npx skills add ravan/scriptorium --list                     # see what is in here
+npx skills add ravan/scriptorium --skill wiki               # just the wiki skill
+npx skills add ravan/scriptorium -g -a claude-code -y       # user-wide, no prompts
+```
 
-Have them already? The agent copies them in at setup. Don't? Say *"capture my voice"* — the agent either drafts a profile from 3–5 writing samples you paste, or runs a ~15-minute interview where every question comes with three sample answers in three different personas, so you can pick, mix, or answer freely. Filled examples for a fictional writer live in `skills/wiki/examples/`.
+`-g` installs to `~/.claude/skills`. Without it the skill lands in the current project's `.claude/skills`.
 
-## Composition and branding
+| Skill | What it is |
+|---|---|
+| `wiki` | The skill itself: ingest, maintain, compose. |
+| `lolly` | Generates visual assets: charts, diagrams, codes, backgrounds. Optional. |
+| `suse-brand` | An example brand skill: palette, typography, logo rules. Replace it with your own. |
 
-Everything visual is template-driven. A template is a folder the agent reads and you can edit — no code changes needed to restyle or retune anything.
+## From an empty folder to a first deck
 
-### Brand skill
+You do not need to know the command line. The agent runs every command and asks a plain yes or no question before it installs anything.
 
-At setup, name a brand skill (this repo ships `skills/suse-brand/` as an example: palette, typography, logo markup, component rules, voice notes). The wiki skill loads it before composing slides, documents or SVGs, and every generated visual follows it — including the rule that all artifacts use the brand typeface, never fonts found inside ingested source files. No brand skill? Outputs use a clean neutral default.
+1. **Install the skill.** See above, then restart your agent.
+2. **Create a wiki.** Say: *"Set up a wiki called Sovereignty Research."* The agent checks for bun, poppler and git. It asks before installing anything that is missing, then scaffolds the folder. Default location is `~/Wikis/<name>`.
+3. **Add sources.** Drop files into `raw/`: `.pptx`, `.pdf`, `.docx`, markdown, text and images. Subfolders are fine.
+4. **Ingest.** Say: *"Ingest my sources."* The scripts pull out text, speaker notes and embedded images. The agent reads all of it and views every image and describes it. Then it writes and cross-links the wiki pages.
+5. **Ask questions.** *"What do we know about data residency rules?"* Answers cite wiki pages. Answers worth keeping get filed back into `wiki/syntheses/`.
+6. **Compose.** *"Write a LinkedIn post about X"* or *"make a slide deck on Y"* or *"write a whitepaper on Z as PDF"*. Outputs land in `outputs/`.
 
-### Slide templates (`templates/slides/`)
+Say *"ingest slowly"* if you want to review each source together before it is filed.
 
-Every deck is rendered through a template folder: `template.json` (fonts, semantic colors, footer) plus assets (logo SVGs, cover photo, `.ttf` brand fonts). The template owns the masters — logo and page number on every slide, dark section dividers, a photo title slide. Shipped:
+Decks are real `.pptx` files that import into Google Slides through File then Import. Documents render to `.md`, `.docx` or `.pdf` from one spec.
 
-- **`suse-sovereign`** — built from a real SUSE customer deck: SUSE typeface, Pine/Jungle palette, geeko lockup, brand photo cover.
-- **`neutral`** — clean and unbranded.
+## Your voice is two files, not a prompt you retype
 
-The wiki's `CLAUDE.md` names the default in its `slide_template:` key. The deck spec supports assertion-first layouts: `title`, `section`, `content` (with an optional side visual), `two-col`, `image`, `big-number`, `quote`, `closing`.
+Composed outputs are governed by two files in `profile/`.
 
-**Slide quality is enforced, not hoped for.** The compose rules are evidence-based (assertion-evidence research, cognitive-load text limits): a full-sentence assertion per slide, max 5 bullets of ≤16 words, the spoken narrative in speaker notes, a visual every 2-3 slides, and as few slides as the argument needs — one good diagram replaces the slides that would have explained it. The renderer lints every spec (too many bullets, wordy titles, missing notes, text-only runs, padding section dividers) and the agent must fix every warning before delivering.
+- **`voice.md`**: how you sound. Openings, sentence rhythm, a kill list of banned words, hard rules.
+- **`quality-and-style.md`**: what "good" means per format. Structure, evidence rules, ship checklists.
 
-### Document templates (`templates/docs/`)
+Have them already? The agent copies them in at setup. If you do not, say *"capture my voice"*.
 
-A document template is a document **type**, not just a skin: `template.json` carries the styling *and the rules* (word range, bullet policy, figure density); `structure.md` is the section skeleton the agent must follow. Shipped:
+The agent then drafts a profile from three to five writing samples you paste, or runs a fifteen minute interview. Every interview question comes with three sample answers written in three different personas, so you can pick one or mix them or answer freely. Filled examples for a fictional writer live in `skills/wiki/examples/`.
 
-- **`whitepaper`** — branded cover page, exec summary → problem → approach → evidence → references; 1500–6000 words, figures required.
-- **`pov`** — a point of view argued in 2–4 pages: stance first, exactly three arguments, an honest caveat.
-- **`amazon-6pager`** — narrative decision memo; prose only (**the renderer rejects bullets**), 1800–3300 words, FAQ section.
+## Everything visual comes from a template folder you can edit
 
-One spec renders to all formats: `bun scripts/compose-doc.ts <spec> -o out.md|.docx|.pdf`. PDF is produced from branded HTML with the real brand fonts embedded, via Chrome/Chromium (`doctor.ts` checks; `.md`/`.docx` need nothing).
+A template is a folder the agent reads. Restyling or retuning needs no code change.
 
-### Generated visuals
+### The brand skill is loaded before anything visual is drawn
 
-The agent never pastes source screenshots. Diagrams and charts are generated fresh as SVGs following the brand skill (palette, typography, component rules), then converted to PNG automatically — rendered with the template's own font files, so they look right even on machines without the brand font installed. Images are always placed at true aspect ratio.
+At setup you name a brand skill. This repo ships `skills/suse-brand/` as a worked example: palette, typography, logo markup, component rules and voice notes.
 
-### Extending and fine-tuning in your wiki
+The wiki skill loads it before composing slides, documents or SVGs. That includes the rule that every artifact uses the brand typeface, never a font found inside an ingested source file. With no brand skill the outputs use a clean neutral default.
 
-Templates live inside your wiki and are yours to change:
+### A slide template owns the masters, not just the colours
 
-- **Tweak** a shipped template: edit its `template.json` (colors, fonts, footer text, word caps, bullet policy) or a doc template's `structure.md`. Skill-shipped templates are refreshed when `setup.ts` re-runs, so copy one to a new name before deep edits.
-- **Add your own**: copy any template folder to a sibling name (`templates/slides/acme/`, `templates/docs/case-study/`), adjust, and tell the agent to use it — or ask the agent to build one for you from a reference deck or document.
-- **Swap the default deck look** via `slide_template:` in the wiki's `CLAUDE.md`; document types are chosen per request ("make it a PoV").
-- **Assets**: drop your logo SVGs, a cover photo (pre-cropped to the 4.93:7.5 title panel for slides) and brand `.ttf` files into the template's `assets/`; shared brand assets live once in `templates/shared/`.
+Every deck renders through a folder under `templates/slides/`. It holds `template.json` for fonts and semantic colours and footer, plus the assets: logo SVGs, a cover photo and `.ttf` brand fonts.
 
-## What ingestion extracts
+The template owns the logo and page number on every slide, the dark section dividers and the photo title slide. Two ship today:
+
+- **`suse-sovereign`**: built from a real deck. SUSE typeface, Pine and Jungle palette, geeko lockup, brand photo cover.
+- **`neutral`**: clean and unbranded.
+
+The wiki's `CLAUDE.md` names the default in its `slide_template:` key. The deck spec supports assertion-first layouts: `title`, `section`, `content` with an optional side visual, `two-col`, `image`, `big-number`, `quote` and `closing`.
+
+### Slide quality is linted, not hoped for
+
+The compose rules come from assertion-evidence research and cognitive-load text limits. A full sentence assertion per slide. At most 5 bullets of 16 words or fewer. The spoken narrative goes in the speaker notes.
+
+A visual appears every two or three slides, and a deck runs as short as the argument allows. One good diagram replaces the four slides that would have explained it.
+
+The renderer lints every spec for too many bullets, wordy titles, missing notes, runs of text-only slides and padding section dividers. The agent has to clear every warning before it hands the deck over.
+
+### A document template is a document type, not a skin
+
+`template.json` carries the styling and the rules: word range, bullet policy, figure density. `structure.md` is the section skeleton the agent has to follow. Three ship today:
+
+- **`whitepaper`**: branded cover page, then exec summary, problem, approach, evidence and references. 1500 to 6000 words. Figures required.
+- **`pov`**: a point of view argued in two to four pages. Stance first, exactly three arguments, one honest caveat.
+- **`amazon-6pager`**: a narrative decision memo. Prose only, so the renderer rejects bullets. 1800 to 3300 words, with an FAQ section.
+
+One spec renders to every format: `bun scripts/compose-doc.ts <spec> -o out.md|.docx|.pdf`. PDF comes from branded HTML with the real brand fonts embedded, rendered through Chrome or Chromium. `.md` and `.docx` need nothing extra.
+
+### Diagrams are generated, never screenshotted
+
+The agent does not paste pictures out of your source files. Diagrams and charts are drawn fresh as SVGs following the brand skill, then converted to PNG.
+
+Rendering uses the template's own font files, so the output looks right on a machine that has never had the brand font installed. Images are always placed at true aspect ratio.
+
+### Templates live inside your wiki, so they are yours to change
+
+- **Tweak** a shipped template through its `template.json`: colours, fonts, footer text, word caps and bullet policy. A doc template's `structure.md` is editable the same way. Skill-shipped templates get refreshed when `setup.ts` re-runs, so copy one to a new name before you make deep edits.
+- **Add your own** by copying a folder to a sibling name such as `templates/slides/acme/` or `templates/docs/case-study/`. Adjust it, then tell the agent to use it. The agent can also build one for you from a reference deck or document.
+- **Swap the default deck look** through `slide_template:` in the wiki's `CLAUDE.md`. Document types are chosen per request instead, as in "make it a PoV".
+- **Drop in assets** under the template's `assets/`: your logo SVGs, a cover photo pre-cropped to the 4.93:7.5 title panel and your brand `.ttf` files. Shared brand assets live once in `templates/shared/`.
+
+## What ingestion pulls out of each file type
 
 | Source | Extracted |
 |---|---|
-| `.pptx` | Per-slide text, speaker notes, embedded images (read as zip+XML — no PowerPoint or LibreOffice needed) |
-| `.docx` | Full text, embedded images |
-| `.pdf` | Text, embedded images, a picture of each page (via poppler) |
-| `.md` / `.txt` / images | Read directly |
+| `.pptx` | Per-slide text, speaker notes, embedded images. Read as zip and XML, so no PowerPoint or LibreOffice needed. |
+| `.docx` | Full text and embedded images. |
+| `.pdf` | Text, embedded images and a picture of each page, through poppler. |
+| `.md` / `.txt` / images | Read directly. |
 
-`raw/.ingest-manifest.json` tracks every file by content hash: edit a source and the next ingest re-extracts it and updates the pages it touched; delete a source and the wiki keeps the knowledge but flags it. Every ingest ends in a git commit, so the wiki has full history.
+`raw/.ingest-manifest.json` tracks every file by content hash. Edit a source and the next ingest re-extracts it and updates the pages it touched. Delete a source and the wiki keeps the knowledge but flags it.
 
-## The scripts
+Every ingest ends in a git commit, so the wiki carries its full history.
 
-All run with [bun](https://bun.sh), from the wiki folder. Each wiki carries its own copy in `scripts/`.
+## The scripts do the half that should never be improvised
+
+All of them run with [bun](https://bun.sh) from the wiki folder. Each wiki carries its own copy in `scripts/`.
 
 | Script | Job |
 |---|---|
-| `doctor.ts` | Check required tools; print plain-language install hints |
-| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>]` | Scaffold or repair a wiki (idempotent, never overwrites your content; refreshes `scripts/` and skill-shipped templates) |
+| `doctor.ts` | Check required tools and print plain-language install hints |
+| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>]` | Scaffold or repair a wiki. Idempotent, never overwrites your content, refreshes `scripts/` and skill-shipped templates |
 | `ingest.ts [--dry-run]` | Scan `raw/`, update the manifest, extract to `derived/` |
 | `manifest.ts status\|pending\|mark-ingested` | Inspect and update ingest state |
-| `compose-pptx.ts <spec.json> -o out.pptx` | Render a slide spec through a `templates/slides/` template; lints against the slide rules |
-| `compose-doc.ts <spec.json> -o out.(md\|docx\|pdf)` | Render a document spec through a `templates/docs/` template; lints against the template's word/bullet/figure rules |
+| `compose-pptx.ts <spec.json> -o out.pptx` | Render a slide spec through a `templates/slides/` template and lint it |
+| `compose-doc.ts <spec.json> -o out.(md\|docx\|pdf)` | Render a document spec through a `templates/docs/` template and lint it against the word, bullet and figure rules |
 | `compose-docx.ts <spec.json> -o out.docx` | Back-compat shim over `compose-doc.ts` |
 
-Spec JSON shapes are documented in the header comments of the compose scripts. SVG images referenced in specs are converted to PNG automatically, using the template's font files.
+The spec JSON shapes are documented in the header comments of the compose scripts. SVG images named in a spec are converted to PNG automatically, using the template's font files.
 
-**Requirements:** macOS or Linux, `bun` 1.4+, `unzip` (ships with macOS), `poppler` (`brew install poppler`), `git` (optional but recommended), Chrome or Chromium (optional — only for `.pdf` output). `doctor.ts` checks all of it.
+**Requirements**: macOS or Linux, `bun` 1.4+, `unzip` and `poppler`. `unzip` ships with macOS and `poppler` comes from `brew install poppler`. `git` is optional but worth having, and Chrome or Chromium is needed only for `.pdf` output. `doctor.ts` checks all of it.
+
+## Decisions, and what each one rejected
+
+- **A compiled wiki instead of RAG over the raw files.** RAG was rejected because it pays the understanding cost on every question and never accumulates. The cost here is an ingest step you have to run.
+- **Scripts for extraction, agent for judgment.** Letting the agent parse `.pptx` and `.pdf` directly was rejected as non-repeatable. Two runs over the same deck have to produce the same `derived/` output.
+- **`.pptx` read as zip and XML.** Driving LibreOffice or PowerPoint was rejected because it adds a large install and a headless failure mode on a machine you do not control.
+- **Templates as folders of JSON and assets.** Styling in code was rejected because rebranding a deck should not be a pull request.
+- **Lints that block delivery.** Guidance in the prompt was rejected because the agent talks itself past guidance. A failing lint line is harder to argue with.
+
+## What is still open
+
+- The repository is `scriptorium` but the skill inside it is still named `wiki`, because "my wiki" is what people actually say when they want it.
+- Only macOS and Linux are exercised. Windows is untested rather than unsupported.
+- The three document templates cover the shapes I needed. Anything else is a folder you write yourself.
 
 ## This repository
 
-This is the skill's development repo.
-
 ```
-skills/wiki/          # the skill: SKILL.md, references/, templates/ (slides, docs, shared), examples/, scripts/
+skills/wiki/          # the skill: SKILL.md, references/, templates/, examples/, scripts/
+skills/lolly/         # visual-asset skill used when composing
 skills/suse-brand/    # example brand skill
 .claude/skills/       # symlinks so this repo can run the skills directly
-docs/                 # the original idea (kapathy/gist.md), profile examples, sample source decks
-testing/my-wiki/      # a live test wiki with composed outputs (deck, whitepaper in md/docx/pdf)
+docs/                 # the original idea (karpathy/gist.md), profile examples, sample decks
+testing/my-wiki/      # a live test wiki with composed outputs
 ```
 
-To work on the skill, edit under `skills/wiki/` and test by creating a throwaway wiki: `bun skills/wiki/scripts/setup.ts /tmp/test-wiki --name "Test"`, drop files in its `raw/`, then run its `scripts/ingest.ts`.
+`skills/<name>/SKILL.md` is the layout the skills CLI discovers. Anything added under `skills/` installs straight from GitHub, with no packaging step and no npm publish.
+
+To work on the skill, edit under `skills/wiki/` and test against a throwaway wiki: `bun skills/wiki/scripts/setup.ts /tmp/test-wiki --name "Test"`. Drop files into its `raw/`, then run its `scripts/ingest.ts`.
+
+## Those forty decks
+
+They are still sitting in the folder. The difference is that now they get read once, by something that writes down what it found and remembers it the next time you ask.
+
+## License
+
+[MIT](LICENSE), copyright Ravan Naidoo. The SUSE brand assets under `skills/suse-brand/` and `skills/wiki/templates/shared/suse/` are SUSE property and are included here as a worked example only.
