@@ -22,7 +22,7 @@ Location default: `~/Wikis/<name>` (kebab-case the name). A user-supplied path w
 bun <skill>/scripts/setup.ts ~/Wikis/<name> --name "<Name>" [--brand <brand-skill>]
 ```
 
-Idempotent: safe to re-run, never overwrites. It creates the folders, the manifest, seed `wiki/index.md` + `wiki/log.md`, the wiki `CLAUDE.md` (from `templates/wiki-claude.md`), copies `scripts/` in, runs `bun install`, and makes the first git commit.
+Idempotent: safe to re-run, never overwrites content. It creates the folders, the manifest, seeds `wiki/log.jsonl`, the wiki `CLAUDE.md` (from `templates/wiki-claude.md`), copies `scripts/` in (refreshing skill-owned scripts), runs `bun install`, generates `wiki/index.json` + `wiki/map.json` via `links.ts`, and makes the first git commit.
 
 ## 4. Profile
 

@@ -49,7 +49,39 @@ const checks: Check[] = [
   },
 ];
 
-const results = checks.map((c) => ({ ...c, found: have(c.cmd) }));
+// Chrome/Chromium: only needed to render PDFs (compose-doc.ts); .md/.docx work without it.
+function haveChrome(): boolean {
+  const { existsSync } = require("node:fs");
+  const cands = [
+    process.env.WIKI_CHROME,
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ].filter(Boolean) as string[];
+  return cands.some(existsSync) || have("chromium") || have("google-chrome");
+}
+
+// Bun itself: 1.4+ is the floor (the scripts use Bun.Image for junk detection).
+const bunOk = typeof Bun.Image === "function";
+const results = [
+  {
+    cmd: "chrome",
+    why: "turns documents into PDF files (only needed for .pdf output)",
+    install: "install Google Chrome, or set WIKI_CHROME to a Chromium binary",
+    required: false,
+    found: haveChrome(),
+  },
+  {
+    cmd: `bun ${Bun.version}`,
+    why: "runs these scripts; 1.4 or newer is needed",
+    install: "bun upgrade",
+    required: true,
+    found: bunOk,
+  },
+  ...checks.map((c) => ({ ...c, found: have(c.cmd) })),
+];
 const missing = results.filter((r) => !r.found);
 
 if (process.argv.includes("--json")) {

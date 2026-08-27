@@ -1,0 +1,25 @@
+{
+  "name": "suse-sovereign",
+  "description": "SUSE brand template derived from the Sovereign Stack customer deck. Pine + Jungle on white, SUSE typeface, geeko lockup on every slide, Pine section dividers, brand photo on the title slide.",
+  "font": { "heading": "SUSE", "body": "SUSE" },
+  "colors": {
+    "bg": "FFFFFF",
+    "text": "1D1D1D",
+    "heading": "0C322C",
+    "accent": "30BA78",
+    "accent2": "FE7C3F",
+    "muted": "6F6F6F",
+    "hairline": "DCDBDC",
+    "tint": "EAFAF4",
+    "sectionBg": "0C322C",
+    "sectionText": "FFFFFF",
+    "sectionMuted": "90EBCD",
+    "number": "30BA78"
+  },
+  "assets": {
+    "logoLight": "assets/logo-green.svg",
+    "logoDark": "assets/logo-white.svg",
+    "cover": "assets/cover.jpg"
+  },
+  "footerText": ""
+}

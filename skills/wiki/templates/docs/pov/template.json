@@ -1,0 +1,30 @@
+{
+  "name": "pov",
+  "description": "Point-of-view paper: a stance argued in 2-4 pages. Lighter than a whitepaper, opinionated by design.",
+  "font": { "heading": "SUSE", "body": "SUSE" },
+  "colors": {
+    "heading": "0C322C",
+    "text": "1D1D1D",
+    "accent": "30BA78",
+    "muted": "6F6F6F",
+    "hairline": "DCDBDC",
+    "calloutBg": "EAFAF4",
+    "coverBg": "FFFFFF",
+    "coverText": "0C322C",
+    "coverMuted": "6F6F6F"
+  },
+  "assets": {
+    "logo": "../../shared/suse/logo-green.svg",
+    "logoDark": "../../shared/suse/logo-white.svg",
+    "fontsDir": "../../shared/suse/fonts"
+  },
+  "page": { "size": "A4", "marginCm": 2.2 },
+  "cover": false,
+  "h1PageBreak": false,
+  "rules": {
+    "bulletsAllowed": true,
+    "maxWords": 2200,
+    "minWords": 600,
+    "figureEveryWords": 1100
+  }
+}

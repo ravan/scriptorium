@@ -1,0 +1,21 @@
+{
+  "name": "neutral",
+  "description": "Clean brand-free default: ink on white, gray accents, Calibri. Used when a wiki has no brand skill or the user asks for unbranded slides.",
+  "font": { "heading": "Calibri", "body": "Calibri" },
+  "colors": {
+    "bg": "FFFFFF",
+    "text": "1D1D1D",
+    "heading": "222222",
+    "accent": "555555",
+    "accent2": "888888",
+    "muted": "777777",
+    "hairline": "DDDDDD",
+    "tint": "F2F2F2",
+    "sectionBg": "222222",
+    "sectionText": "FFFFFF",
+    "sectionMuted": "BBBBBB",
+    "number": "222222"
+  },
+  "assets": {},
+  "footerText": ""
+}

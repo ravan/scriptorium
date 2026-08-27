@@ -5,3 +5,5 @@ baton.json
 
 /docs
 /testing/my-wiki
+node_modules/
+/refs

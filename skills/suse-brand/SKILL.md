@@ -83,6 +83,7 @@ Official fallbacks when SUSE is unavailable: Verdana for the sans, Roboto Mono f
 - Real italics exist for both families, use them rather than faux oblique.
 - There is no secondary display face. Contrast comes from size, colour and spacing, not from mixing families or piling on weight.
 - Inside Lolly, always reach for the tokens: `var(--font-brand)` and `var(--font-mono)`, so a branded profile's faces win.
+- **Every generated artifact uses the SUSE family - pptx, docx, SVG, HTML, images, all of them.** In pptx/docx specs set the theme font to `SUSE`; in SVG/HTML set `font-family: 'SUSE', Verdana, sans-serif`. Never copy a font found inside an ingested source document: fonts like **Poppins**, Calibri or Arial in old SUSE decks and docs are legacy template fonts, not the brand. If the SUSE font is not installed on the machine that renders or views the artifact, install it from Google Fonts rather than substituting another face; office formats do not embed fonts, so the viewer's machine needs it too (Verdana is the accepted fallback when installing is impossible).
 
 ## Logo
 

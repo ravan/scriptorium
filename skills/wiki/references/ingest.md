@@ -11,17 +11,39 @@ Two speeds. **Batch** (default): process everything pending, log each. **Slow** 
    - **docx** → `text.md` + `media/`
    - **pdf** → `text.txt` + `media/` (embedded images) + `pages/` (a picture of each page, capped at 60 - the cap is printed, never silent)
    - **md/txt/images** → no extraction; read the raw file directly
-2. For each file listed by `bun scripts/manifest.ts pending` (not only what the latest run printed - an interrupted ingest leaves earlier files pending too), build understanding:
-   - Read the derived text (or raw file).
-   - **View every image** in `media/` (and `pages/` when the text alone is unclear). For each, write a one-line description: what it shows and why it matters. These descriptions are what makes the wiki rich enough to recompose from later - the wiki must "know" what every illustration said.
-3. Write `wiki/sources/<slug>.md`, where `<slug>` = the path relative to `raw/` with folders joined by `--` and the extension dropped (`papers/whitepaper.docx` → `papers--whitepaper.md`). This keeps two same-named files in different folders from colliding. Page content: purpose line, key takeaways, notable claims (with slide/page numbers), image descriptions linking to `derived/.../media/...`.
-4. Ripple outward: update or create `topics/`, `entities/`, `syntheses/` pages this source touches, flag contradictions (both claims, both links), and update `wiki/index.md`. A single source may touch 10-15 pages; that is normal.
-5. Close out each source:
+
+   Junk images are **gated at extraction**: blanks (decode to one flat colour), tiny icons (long side under 64 px), byte-identical duplicates, and unviewable vector formats (emf/wmf) are moved to `media/skipped/` (or `pages/skipped/`) with the reason recorded in `derived/<slug>/skipped.json`. You never view them; you only account for them (step 3). `--re-extract <raw-rel-path>` forces one unchanged file through extraction again (after `clean.ts`, or to apply a newer gate) without changing its manifest status.
+2. Survey the batch before reading a word of it. Two commands, once per run:
+   ```
+   bun scripts/outline.ts     # structure + read plan for every pending text
+   bun scripts/media.ts       # every pending image, with paths to view
+   ```
+   `outline.ts` prints a heading map and a ready-to-paste `sed -n 'a,bp'` slice per section. Extracted text runs to 40 KB and more; `cat` on a file that size truncates and you lose the tail without being told. Read the slices instead.
+
+   `media.ts` prints absolute image paths (paste straight into a file read) for images **worth viewing only** - the extraction gate already filtered junk, and anything junk-like that survives in an older derived/ folder is reported as counts and relative paths, never as a viewable path. Cross-source byte-identical files are grouped: view the first, reuse its description. A "possible near-duplicates" hint (same format and pixel size) is only a hint; check while viewing.
+
+3. For each file listed by `bun scripts/manifest.ts pending` (not only what the latest run printed - an interrupted ingest leaves earlier files pending too), build understanding:
+   - Read the derived text (or raw file), in the slices `outline.ts` gave you.
+   - **View every image `media.ts` lists** (and `pages/` when the text alone is unclear). For each, write a one-line description: what it shows and why it matters. These descriptions are what makes the wiki rich enough to recompose from later - the wiki must "know" what every illustration said. Account for the gated ones in the source page in a single line, from `skipped.json` (e.g. "12 further images were blanks/icons, filtered at extraction") - never link to a skipped file.
+4. Write `wiki/sources/<slug>.md`, where `<slug>` = the path relative to `raw/` with folders joined by `--` and the extension dropped (`papers/whitepaper.docx` → `papers--whitepaper.md`). This keeps two same-named files in different folders from colliding. Page content: purpose line, key takeaways, notable claims (with slide/page numbers), image descriptions linking to `derived/.../media/...`.
+5. Ripple outward: update or create `topics/`, `entities/`, `syntheses/` pages this source touches and flag contradictions (both claims, both links). A single source may touch 10-15 pages; that is normal. There is no index to maintain - `wiki/index.json` is generated from each page's purpose line, so getting that first sentence right IS the index work.
+6. Close out each source:
    ```
    bun scripts/manifest.ts mark-ingested <raw-rel-path> --pages "wiki/sources/x.md,wiki/topics/y.md"
    ```
    `--pages` appends (a union across calls), so listing a shared topic page from every source that touches it is correct.
-6. Append one log entry per source to `wiki/log.md` (title = the raw file name, with `(updated)` or `(removed)` added when that applies). Then one git commit for the whole batch: `git add -A && git commit -m "ingest: <files or count>"`.
+7. Log one entry per source (title = the raw file name, with `(updated)` or `(removed)` added when that applies):
+   ```
+   bun scripts/wiki.ts log ingest "<raw file name>" --pages "wiki/sources/x.md,wiki/topics/y.md"
+   ```
+   Then check the wiring you just wrote and commit the batch:
+   ```
+   bun scripts/links.ts
+   git add -A && git commit -m "ingest: <files or count>"
+   ```
+   `links.ts` exits 1 when a relative link is broken, a page the manifest claims exists is missing, or a `[[wikilink]]` slipped in. One ingest can add sixty links by hand, and a broken one is invisible until someone follows it. Fix what it reports before committing (it also warns on pages missing their purpose line - fix those too, the line is the page's search summary). The same run regenerates `wiki/index.json` and `wiki/map.json` - commit them with the batch; never edit them by hand.
+
+8. Optional, when the user cares about disk space: `bun scripts/clean.ts` shows what derived/ material of ingested sources can go (gated junk, PDF page renders, unreferenced media); `--apply` deletes it. Everything is regenerable with `bun scripts/ingest.ts --re-extract <file>`.
 
 ## States you will meet
 

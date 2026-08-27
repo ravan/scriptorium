@@ -2,7 +2,15 @@
 // Scans raw/, updates the manifest, and extracts text + images from new or
 // changed sources into derived/. The agent then reads derived/ and writes wiki
 // pages. This script never touches wiki/.
-// Usage: bun ingest.ts [wiki-folder] [--dry-run]
+//
+// Junk images (blank, tiny, duplicate, unviewable - see image.ts) are gated
+// out at extraction: moved to media/skipped/ with a skipped.json note, so the
+// agent never sees a path it should not view.
+//
+// Usage: bun ingest.ts [wiki-folder] [--dry-run] [--re-extract <raw-rel-path>]
+//   --re-extract forces one unchanged file through extraction again (e.g. to
+//   regenerate derived/ after clean.ts, or to apply a newer junk gate). The
+//   file keeps its manifest status.
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join, relative } from "node:path";
 import {
@@ -16,8 +24,15 @@ import {
   slugFor,
   wikiRootOrDie,
 } from "./common";
+import { type SkippedEntry, gateMediaDir, writeSkippedJson } from "./image";
 
 const dryRun = process.argv.includes("--dry-run");
+const reExtractIdx = process.argv.indexOf("--re-extract");
+const reExtract = reExtractIdx > -1 ? process.argv[reExtractIdx + 1] : undefined;
+if (reExtractIdx > -1 && !reExtract) {
+  console.error("--re-extract needs a raw-relative path, e.g. --re-extract deck.pptx");
+  process.exit(1);
+}
 const rootArg = process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : undefined;
 const root = wikiRootOrDie(rootArg);
 const rawDir = join(root, "raw");
@@ -100,11 +115,24 @@ async function extractPptx(src: string, outDir: string): Promise<string> {
       if (notes.length) lines.push("### Speaker notes", "", notes.join("\n\n"), "");
     }
   }
-  const media = copyMedia(join(tmp, "ppt", "media"), join(outDir, "media"));
-  if (media.length) lines.push(`## Embedded media`, "", media.map((m) => `- media/${m}`).join("\n"), "");
+  copyMedia(join(tmp, "ppt", "media"), join(outDir, "media"));
   rmSync(tmp, { recursive: true, force: true });
+  const gate = await gateMediaDir(join(outDir, "media"), "media/", new Map());
+  writeSkippedJson(outDir, gate.skipped);
+  if (gate.kept.length)
+    lines.push(`## Embedded media`, "", gate.kept.map((m) => `- media/${m}`).join("\n"), "");
+  if (gate.skipped.length)
+    lines.push(`(${gate.skipped.length} junk image(s) auto-skipped at extraction - see skipped.json)`, "");
   writeFileSync(join(outDir, "text.md"), lines.join("\n"));
-  return `${nums.length} slides, ${media.length} media files`;
+  return `${nums.length} slides, ${gate.kept.length} media files${junkNote(gate.skipped)}`;
+}
+
+function junkNote(skipped: SkippedEntry[]): string {
+  if (!skipped.length) return "";
+  const byReason = new Map<string, number>();
+  for (const s of skipped) byReason.set(s.reason, (byReason.get(s.reason) ?? 0) + 1);
+  const parts = [...byReason.entries()].map(([r, n]) => `${n} ${r}`);
+  return `, ${skipped.length} junk skipped (${parts.join(", ")})`;
 }
 
 async function extractDocx(src: string, outDir: string): Promise<string> {
@@ -112,15 +140,19 @@ async function extractDocx(src: string, outDir: string): Promise<string> {
   if (!unzipTo(src, tmp)) throw new Error("unzip failed for " + src);
   const xml = await Bun.file(join(tmp, "word", "document.xml")).text();
   const paras = paragraphsFrom(xml, /<\/w:p>/, /<w:t[^>]*>([^<]*)<\/w:t>/g);
-  const media = copyMedia(join(tmp, "word", "media"), join(outDir, "media"));
+  copyMedia(join(tmp, "word", "media"), join(outDir, "media"));
   rmSync(tmp, { recursive: true, force: true });
+  const gate = await gateMediaDir(join(outDir, "media"), "media/", new Map());
+  writeSkippedJson(outDir, gate.skipped);
   const lines = [`# ${basename(src)} - extracted text`, "", ...paras.map((p) => p + "\n")];
-  if (media.length) lines.push(`## Embedded media`, "", media.map((m) => `- media/${m}`).join("\n"));
+  if (gate.kept.length) lines.push(`## Embedded media`, "", gate.kept.map((m) => `- media/${m}`).join("\n"));
+  if (gate.skipped.length)
+    lines.push(`(${gate.skipped.length} junk image(s) auto-skipped at extraction - see skipped.json)`);
   writeFileSync(join(outDir, "text.md"), lines.join("\n"));
-  return `${paras.length} paragraphs, ${media.length} media files`;
+  return `${paras.length} paragraphs, ${gate.kept.length} media files${junkNote(gate.skipped)}`;
 }
 
-function extractPdf(src: string, outDir: string): string {
+async function extractPdf(src: string, outDir: string): Promise<string> {
   for (const tool of ["pdftotext", "pdfimages", "pdftoppm", "pdfinfo"]) {
     if (!have(tool)) throw new Error(`${tool} is missing. Install with: brew install poppler`);
   }
@@ -135,8 +167,13 @@ function extractPdf(src: string, outDir: string): string {
   const renderTo = Math.min(pages, PAGE_RENDER_CAP);
   if (renderTo > 0) run(["pdftoppm", "-png", "-r", "80", "-l", String(renderTo), src, join(pagesDir, "page")]);
   const capNote = pages > PAGE_RENDER_CAP ? ` (page images capped at ${PAGE_RENDER_CAP} of ${pages})` : "";
-  const imgs = readdirSync(mediaDir).length;
-  return `${pages} pages, ${imgs} embedded images${capNote}`;
+  // One seen-map across media/ and pages/ so a duplicate is caught wherever it sits.
+  const seen = new Map<string, string>();
+  const mediaGate = await gateMediaDir(mediaDir, "media/", seen);
+  const pagesGate = await gateMediaDir(pagesDir, "pages/", seen);
+  const skipped = [...mediaGate.skipped, ...pagesGate.skipped];
+  writeSkippedJson(outDir, skipped);
+  return `${pages} pages, ${mediaGate.kept.length} embedded images${capNote}${junkNote(skipped)}`;
 }
 
 // ---------- main ----------
@@ -152,7 +189,8 @@ for (const abs of listRawFiles(rawDir)) {
   const prev = manifest.files[rel];
   const type = typeFor(extname(abs).toLowerCase());
 
-  if (prev && prev.sha256 === hash && prev.status !== "removed") {
+  const forced = reExtract === rel;
+  if (prev && prev.sha256 === hash && prev.status !== "removed" && !forced) {
     summary.unchanged++;
     continue;
   }
@@ -174,7 +212,7 @@ for (const abs of listRawFiles(rawDir)) {
       note =
         type === "pptx" ? await extractPptx(abs, outDir)
         : type === "docx" ? await extractDocx(abs, outDir)
-        : extractPdf(abs, outDir);
+        : await extractPdf(abs, outDir);
     } else if (type === "markdown" || type === "text" || type === "image") {
       note = "read the raw file directly; no extraction needed";
     } else {
@@ -187,6 +225,10 @@ for (const abs of listRawFiles(rawDir)) {
     note = String(e);
   }
 
+  // A forced re-extract of an unchanged file regenerates derived/ only; the
+  // wiki already reflects it, so it must not drop back to "extracted".
+  if (forced && prev && prev.sha256 === hash && status === "extracted") status = prev.status;
+
   manifest.files[rel] = {
     sha256: hash,
     size: st.size,
@@ -194,6 +236,7 @@ for (const abs of listRawFiles(rawDir)) {
     type,
     status,
     extractedAt: new Date().toISOString(),
+    ingestedAt: forced ? prev?.ingestedAt : undefined,
     derived: derivedRel,
     pagesTouched: prev?.pagesTouched ?? [],
     note,
@@ -208,6 +251,9 @@ for (const rel of Object.keys(manifest.files)) {
     summary.removed.push(rel);
   }
 }
+
+if (reExtract && !seen.has(reExtract))
+  console.warn(`warning: --re-extract ${reExtract} matched nothing in raw/ (path is relative to raw/).`);
 
 if (!dryRun) saveManifest(root, manifest);
 
