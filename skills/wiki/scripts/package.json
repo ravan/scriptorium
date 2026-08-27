@@ -1,0 +1,14 @@
+{
+  "name": "wiki-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Helper scripts for an LLM-maintained knowledge wiki. Run with bun.",
+  "devDependencies": {
+    "@types/bun": "^1.2.0"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "docx": "^9.5.0",
+    "pptxgenjs": "^3.12.0"
+  }
+}
