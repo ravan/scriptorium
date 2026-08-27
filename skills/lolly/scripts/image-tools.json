@@ -1,0 +1,708 @@
+{
+  "_comment": "Image-producing tools, the set `lolly.ts catalog --image` must return. Checked in so lolly.live.test.ts can prove each one still exists and still makes a picture. Regenerate with: bun scripts/lolly.ts catalog --image",
+  "generated": "2026-08-27",
+  "tools": [
+    {
+      "id": "3d",
+      "name": "3D",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "gif"
+      ]
+    },
+    {
+      "id": "annotate",
+      "name": "Annotate",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp"
+      ]
+    },
+    {
+      "id": "asset-export",
+      "name": "Asset Export",
+      "imageFormats": [
+        "svg",
+        "png",
+        "jpg",
+        "webp",
+        "pdf",
+        "pdf-cmyk",
+        "cmyk-tiff",
+        "ico"
+      ]
+    },
+    {
+      "id": "audiogram",
+      "name": "Audiogram",
+      "imageFormats": [
+        "png",
+        "gif",
+        "webp-anim"
+      ]
+    },
+    {
+      "id": "battlecards",
+      "name": "Battlecards",
+      "imageFormats": [
+        "pdf",
+        "svg",
+        "pdf",
+        "pdf-cmyk",
+        "emf",
+        "png",
+        "webp",
+        "avif",
+        "webp",
+        "jpeg"
+      ]
+    },
+    {
+      "id": "booth-studio",
+      "name": "Booth Studio",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "gif"
+      ]
+    },
+    {
+      "id": "brand-lockup",
+      "name": "Brand Lockup",
+      "imageFormats": [
+        "svg",
+        "png",
+        "emf",
+        "eps",
+        "eps-cmyk",
+        "dxf"
+      ]
+    },
+    {
+      "id": "calendar-ics",
+      "name": "Calendar ICS",
+      "imageFormats": [
+        "png",
+        "svg",
+        "pdf"
+      ]
+    },
+    {
+      "id": "captions",
+      "name": "Captions",
+      "imageFormats": [
+        "png",
+        "svg"
+      ]
+    },
+    {
+      "id": "certificate",
+      "name": "Certificate",
+      "imageFormats": [
+        "pdf",
+        "pdf-cmyk",
+        "svg",
+        "png"
+      ]
+    },
+    {
+      "id": "code-canvas",
+      "name": "Code Canvas",
+      "imageFormats": [
+        "png",
+        "svg"
+      ]
+    },
+    {
+      "id": "color-block",
+      "name": "Color Block",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "pdf",
+        "pdf-cmyk",
+        "cmyk-tiff",
+        "svg"
+      ]
+    },
+    {
+      "id": "color-palette",
+      "name": "Palette Lab",
+      "imageFormats": [
+        "svg",
+        "png",
+        "jpg",
+        "webp"
+      ]
+    },
+    {
+      "id": "compress-pdf",
+      "name": "Compress PDF",
+      "imageFormats": [
+        "pdf"
+      ]
+    },
+    {
+      "id": "contrast-check",
+      "name": "Contrast Checker",
+      "imageFormats": [
+        "svg",
+        "png",
+        "pdf"
+      ]
+    },
+    {
+      "id": "convert-image",
+      "name": "Convert Image",
+      "imageFormats": [
+        "webp",
+        "jpg",
+        "png"
+      ]
+    },
+    {
+      "id": "d3",
+      "name": "D3 Chart Studio",
+      "imageFormats": [
+        "png",
+        "svg",
+        "emf",
+        "pdf",
+        "pdf-cmyk",
+        "cmyk-tiff",
+        "tiff",
+        "webp",
+        "jpg",
+        "apng",
+        "webp-anim",
+        "gif"
+      ]
+    },
+    {
+      "id": "darkroom",
+      "name": "Darkroom",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "svg",
+        "tiff",
+        "pdf"
+      ]
+    },
+    {
+      "id": "deck-builder",
+      "name": "Deck Builder",
+      "imageFormats": [
+        "pdf",
+        "gif"
+      ]
+    },
+    {
+      "id": "deck-studio",
+      "name": "Markdown Slides",
+      "imageFormats": [
+        "pdf",
+        "png"
+      ]
+    },
+    {
+      "id": "design",
+      "name": "Design",
+      "imageFormats": [
+        "png",
+        "svg",
+        "pdf",
+        "pdf-cmyk",
+        "cmyk-tiff",
+        "jpg",
+        "webp",
+        "gif",
+        "apng"
+      ]
+    },
+    {
+      "id": "diagram-builder",
+      "name": "Diagram Builder",
+      "imageFormats": [
+        "svg",
+        "pdf",
+        "dxf",
+        "png"
+      ]
+    },
+    {
+      "id": "digi-ad",
+      "name": "Animated Ad",
+      "imageFormats": [
+        "gif",
+        "apng",
+        "webp-anim",
+        "png",
+        "svg",
+        "svg-anim"
+      ]
+    },
+    {
+      "id": "doc-studio",
+      "name": "Doc Studio",
+      "imageFormats": [
+        "pdf",
+        "svg"
+      ]
+    },
+    {
+      "id": "dynamic-layout",
+      "name": "Dynamic Layout",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "pdf",
+        "pdf-cmyk",
+        "cmyk-tiff",
+        "svg"
+      ]
+    },
+    {
+      "id": "email-signature",
+      "name": "Email Signature",
+      "imageFormats": [
+        "png",
+        "svg"
+      ]
+    },
+    {
+      "id": "embed-track-image",
+      "name": "Embed, Imprint & Track",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "avif",
+        "tiff",
+        "gif",
+        "svg",
+        "pdf"
+      ]
+    },
+    {
+      "id": "event-name-badge",
+      "name": "Event Name Badge",
+      "imageFormats": [
+        "pdf",
+        "pdf-cmyk",
+        "svg",
+        "png",
+        "jpg",
+        "webp"
+      ]
+    },
+    {
+      "id": "filter",
+      "name": "Filter",
+      "imageFormats": [
+        "svg",
+        "pdf",
+        "pdf-cmyk",
+        "emf",
+        "png",
+        "jpg",
+        "webp",
+        "avif",
+        "tiff",
+        "cmyk-tiff",
+        "gif",
+        "apng",
+        "webp-anim"
+      ]
+    },
+    {
+      "id": "finish-preview",
+      "name": "Finish Preview",
+      "imageFormats": [
+        "svg",
+        "pdf",
+        "pdf-cmyk",
+        "png",
+        "jpg",
+        "webp",
+        "avif",
+        "tiff",
+        "cmyk-tiff",
+        "gif",
+        "apng",
+        "webp-anim"
+      ]
+    },
+    {
+      "id": "flythrough",
+      "name": "Flythrough",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "gif"
+      ]
+    },
+    {
+      "id": "growth",
+      "name": "Growth",
+      "imageFormats": [
+        "svg",
+        "pdf",
+        "png",
+        "jpg",
+        "webp",
+        "gif"
+      ]
+    },
+    {
+      "id": "link-card",
+      "name": "Link Card",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "svg",
+        "pdf"
+      ]
+    },
+    {
+      "id": "logo-lockup-partner",
+      "name": "Logo Lockup: Partner",
+      "imageFormats": [
+        "svg",
+        "png",
+        "pdf",
+        "dxf",
+        "jpg",
+        "webp"
+      ]
+    },
+    {
+      "id": "logo-wall",
+      "name": "Logo Lockup: Grid (NASCAR)",
+      "imageFormats": [
+        "png",
+        "svg",
+        "pdf",
+        "dxf",
+        "jpg",
+        "webp"
+      ]
+    },
+    {
+      "id": "lottie-digi-ad",
+      "name": "Lottie Ad",
+      "imageFormats": [
+        "gif",
+        "apng",
+        "png",
+        "svg",
+        "svg-anim"
+      ]
+    },
+    {
+      "id": "meeting-planner",
+      "name": "Meeting Planner",
+      "imageFormats": [
+        "png",
+        "jpeg",
+        "svg"
+      ]
+    },
+    {
+      "id": "mesh-gradient",
+      "name": "Mesh Gradient",
+      "imageFormats": [
+        "svg",
+        "png",
+        "jpg",
+        "webp",
+        "avif",
+        "gif"
+      ]
+    },
+    {
+      "id": "multi-page-pdf",
+      "name": "Multi-Page PDF",
+      "imageFormats": [
+        "pdf",
+        "svg"
+      ]
+    },
+    {
+      "id": "org-chart",
+      "name": "Flow Chart",
+      "imageFormats": [
+        "png",
+        "svg",
+        "pdf",
+        "jpg",
+        "webp"
+      ]
+    },
+    {
+      "id": "pose-geeko",
+      "name": "Pose Geeko",
+      "imageFormats": [
+        "svg",
+        "png",
+        "webp",
+        "avif",
+        "pdf",
+        "dxf",
+        "cmyk-tiff",
+        "jpg"
+      ]
+    },
+    {
+      "id": "pricing-table",
+      "name": "Pricing Table",
+      "imageFormats": [
+        "png",
+        "svg",
+        "pdf"
+      ]
+    },
+    {
+      "id": "print-sheet",
+      "name": "Print Sheet",
+      "imageFormats": [
+        "pdf",
+        "pdf-cmyk",
+        "svg",
+        "png"
+      ]
+    },
+    {
+      "id": "prompt-to-image",
+      "name": "Prompt to Image",
+      "imageFormats": [
+        "png",
+        "webp"
+      ]
+    },
+    {
+      "id": "qr-code",
+      "name": "QR Code Generator",
+      "imageFormats": [
+        "svg",
+        "emf",
+        "eps",
+        "eps-cmyk",
+        "dxf",
+        "pdf",
+        "pdf-cmyk",
+        "cmyk-tiff",
+        "tiff",
+        "png",
+        "jpeg",
+        "webp",
+        "avif"
+      ]
+    },
+    {
+      "id": "quotes",
+      "name": "Quote Card",
+      "imageFormats": [
+        "png",
+        "svg",
+        "pdf",
+        "pdf-cmyk",
+        "cmyk-tiff",
+        "webp",
+        "avif",
+        "jpeg"
+      ]
+    },
+    {
+      "id": "redact",
+      "name": "Redact",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "svg",
+        "pdf"
+      ]
+    },
+    {
+      "id": "run-web-code",
+      "name": "Run Web Code",
+      "imageFormats": [
+        "png",
+        "svg",
+        "pdf"
+      ]
+    },
+    {
+      "id": "scan-code",
+      "name": "Scan a Code",
+      "imageFormats": [
+        "png"
+      ]
+    },
+    {
+      "id": "screencap",
+      "name": "Screen Capture",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp"
+      ]
+    },
+    {
+      "id": "screenshot-frame",
+      "name": "Screenshot Frame",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "svg",
+        "pdf"
+      ]
+    },
+    {
+      "id": "signature",
+      "name": "Signature",
+      "imageFormats": [
+        "svg",
+        "png",
+        "webp",
+        "avif",
+        "pdf"
+      ]
+    },
+    {
+      "id": "spatial-photo",
+      "name": "Spatial Photo",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "gif"
+      ]
+    },
+    {
+      "id": "stationery",
+      "name": "Stationery",
+      "imageFormats": [
+        "pdf",
+        "pdf-cmyk",
+        "svg",
+        "png"
+      ]
+    },
+    {
+      "id": "strip-data",
+      "name": "Strip Hidden Data",
+      "imageFormats": [
+        "jpg",
+        "png",
+        "svg",
+        "pdf"
+      ]
+    },
+    {
+      "id": "synth",
+      "name": "Synth",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "gif",
+        "apng"
+      ]
+    },
+    {
+      "id": "tool-logo",
+      "name": "Logo",
+      "imageFormats": [
+        "svg",
+        "png",
+        "jpg",
+        "webp",
+        "pdf",
+        "pdf-cmyk",
+        "cmyk-tiff",
+        "ico"
+      ]
+    },
+    {
+      "id": "top-tail-recorder",
+      "name": "Top & Tail Video",
+      "imageFormats": [
+        "gif",
+        "apng",
+        "png"
+      ]
+    },
+    {
+      "id": "url-shot",
+      "name": "URL Screenshot",
+      "imageFormats": [
+        "png",
+        "jpg",
+        "webp",
+        "svg",
+        "pdf"
+      ]
+    },
+    {
+      "id": "voice-recorder",
+      "name": "Voice Recorder",
+      "imageFormats": [
+        "png",
+        "svg"
+      ]
+    },
+    {
+      "id": "wayfinding-signage",
+      "name": "Wayfinding Signage",
+      "imageFormats": [
+        "pdf",
+        "pdf-cmyk",
+        "svg",
+        "dxf",
+        "png",
+        "jpg",
+        "webp"
+      ]
+    },
+    {
+      "id": "web-icon",
+      "name": "Web Icon Maker",
+      "imageFormats": [
+        "ico",
+        "png",
+        "svg"
+      ]
+    },
+    {
+      "id": "wordmark",
+      "name": "Wordmark",
+      "imageFormats": [
+        "svg",
+        "emf",
+        "eps",
+        "eps-cmyk",
+        "dxf",
+        "pdf",
+        "pdf-cmyk",
+        "cmyk-tiff",
+        "tiff",
+        "png",
+        "jpeg",
+        "webp",
+        "avif"
+      ]
+    }
+  ]
+}

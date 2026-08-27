@@ -5,7 +5,8 @@ The agent maintains it; the human curates sources and asks questions.
 
 ## Configuration
 
-- **brand_skill**: {{BRAND_SKILL}} (skill to load before composing slides, docx or svg; "none" = neutral default styling)
+- **brand_skill**: {{BRAND_SKILL}} (skill to load before composing slides, docs or images; "none" = neutral default styling)
+- **visuals**: the `lolly` skill when present - a hosted, template-driven generator for charts, codes, gradients, cards, badges and lockups. Renders are on-brand and reproducible from their inputs, so they beat hand-drawn SVG for any shape a tool covers; hand-drawn SVG is for bespoke structure only
 - **slide_template**: {{SLIDE_TEMPLATE}} (folder under `templates/slides/`; every composed deck uses it via the spec's `"template"` key. List choices with `ls templates/slides/`; the user can add their own or ask for a new one)
 - **doc templates**: folders under `templates/docs/` (whitepaper, pov, amazon-6pager, ...). Each is a document type: `template.json` styles and lints it, `structure.md` is its required skeleton. Chosen per request, not globally; renders to .md, .docx or .pdf via `compose-doc.ts`
 - **voice**: `profile/voice.md` (governs the words of every composed output; if missing, offer the profile interview)
@@ -51,12 +52,13 @@ Conventions: standard markdown links with relative paths (never `[[wikilinks]]`)
 ### Query
 Start with `bun scripts/wiki.ts find <terms>` (fall back to `find --text`), then `bun scripts/wiki.ts page <slug>` to see a hit's neighbours, then read the actual pages that matter. Never read `index.json` or `map.json` whole - they grow with the wiki; the queries stay small. Answer with links to wiki pages and raw sources. If the answer produced genuinely new synthesis, file it under `wiki/syntheses/` and log it (`wiki.ts log query "<question>"`).
 
-### Compose (blog, LinkedIn post, slides, docx, svg)
-1. Load `profile/voice.md` + `profile/quality-and-style.md`; for slides/docx/svg also load the brand skill named above.
+### Compose (blog, LinkedIn post, slides, docx, images)
+1. Load `profile/voice.md` + `profile/quality-and-style.md`; for slides/docs/images also load the brand skill named above.
 2. Gather content from wiki pages (never invent facts not in the wiki or raw sources).
-3. Blog/LinkedIn: write markdown into `outputs/`. Slides: follow the skill's `references/compose.md` slide rules (assertion titles, one idea per slide, visuals over bullets), write a spec JSON with `"template"` set to the configured slide_template, then `bun scripts/compose-pptx.ts <spec> -o outputs/<name>.pptx` and fix every `lint:` warning it prints. Documents (whitepaper, PoV, 6-pager as .md/.docx/.pdf): pick a `templates/docs/` template with the user, follow its `structure.md`, write a spec JSON, then `bun scripts/compose-doc.ts <spec> -o outputs/<name>.<ext>` and fix every `lint:` line. Svg: hand-write the SVG following brand rules.
-4. Run the voice and quality checks against the draft before calling it done.
-5. Log entry (`wiki.ts log compose "<title>"`) + git commit. File new insights back into `wiki/syntheses/`.
+3. Blog/LinkedIn: write markdown into `outputs/`. Slides: follow the skill's `references/compose.md` slide rules (assertion titles, one idea per slide, visuals over bullets), write a spec JSON with `"template"` set to the configured slide_template, then `bun scripts/compose-pptx.ts <spec> -o outputs/<name>.pptx` and fix every `lint:` warning it prints. Documents (whitepaper, PoV, 6-pager as .md/.docx/.pdf): pick a `templates/docs/` template with the user, follow its `structure.md`, write a spec JSON, then `bun scripts/compose-doc.ts <spec> -o outputs/<name>.<ext>` and fix every `lint:` line.
+4. **Visuals: you decide, per visual.** If the `lolly` skill is available, ask it first (`bun <skills>/lolly/scripts/lolly.ts catalog --image <keyword>`) - charts, QR codes, gradients, quote cards, badges, lockups and framed screenshots come from a Lolly tool, on-brand and reproducible, and never get hand-drawn. Render with `--format=svg`, set the tool's presentation inputs (a default render is correct but ugly), and annotate the returned SVG yourself where the figure needs to say more. Hand-write brand-true SVG only for bespoke structure no tool covers. Full rules: the skill's `references/compose.md`, "Visuals".
+5. Run the voice and quality checks against the draft before calling it done.
+6. Log entry (`wiki.ts log compose "<title>"`) + git commit. File new insights back into `wiki/syntheses/`.
 
 ### Lint
 Health-check the wiki: contradictions, stale claims, orphan pages (`bun scripts/wiki.ts orphans`), concepts without pages, missing cross-references (`wiki.ts hubs` and `wiki.ts clusters` help spot them), missing purpose lines (links.ts warns), sources stuck in `extracted` status (`bun scripts/manifest.ts pending`). Offer `bun scripts/clean.ts` for disk space. Report findings, fix approved ones, log the pass.

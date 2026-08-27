@@ -6,7 +6,7 @@ Goal: recompose wiki knowledge into a new artifact - blog post, LinkedIn post, s
 
 1. `profile/voice.md` - governs every word of prose. Honor its HARD RULEs absolutely, STRONG TENDENCYs ~70-80% of the time, LIGHT PREFERENCEs by judgment (the profile explains its own labels).
 2. `profile/quality-and-style.md` - governs structure, checklists, antipatterns.
-3. For slides, docx, or SVG: the brand skill named in the wiki's `CLAUDE.md` (`brand_skill:`). If `none`, use the neutral defaults built into the compose scripts.
+3. For slides, docs, or images: the brand skill named in the wiki's `CLAUDE.md` (`brand_skill:`). If `none`, use the neutral defaults built into the compose scripts. Lolly renders carry the brand already; your own SVG and your edits to a render must match it.
 4. If a profile file is missing, offer the interview (references/profile.md) or proceed with a plain, neutral style after saying so.
 
 ## Content rule
@@ -18,8 +18,67 @@ Draw facts from `wiki/` pages (find them with `bun scripts/wiki.ts find <terms>`
 - **Blog / LinkedIn** - markdown straight into `outputs/`. Voice profile fully governs; quality doc supplies the structure and the final checklist.
 - **Slides** - see "Slides" below.
 - **Documents (whitepaper, PoV, 6-pager, ... as .md, .docx or .pdf)** - see "Documents" below.
-- **SVG images** - hand-write the SVG following the brand skill's palette, typography and component rules (vector-first; explicit width/height). New images are generated fresh and context-aware - never copy a raw-source image; use the wiki's image descriptions to inform an improved original.
-- SVGs referenced by slide/docx specs are converted to PNG automatically by the scripts.
+- **Images** - see "Visuals" below. SVGs referenced by slide/doc specs are converted to PNG automatically by the scripts.
+
+## Visuals
+
+**You own the visual, end to end.** Nobody will ask which route you took - the only test is whether the finished artifact reads better. Decide per visual, act, and do not stop to ask permission for a routine choice.
+
+**SVG is the currency.** Both compose scripts accept a `.svg` path and rasterize it themselves, so always ask Lolly for `--format=svg`: it arrives as editable text, not a flat picture, which is what makes route 2 below possible.
+
+### Three routes
+
+**1. Lolly renders it.** A tool already makes this shape - charts, QR and barcodes, gradients, quote cards, certificates, badges, logo lockups, framed screenshots, icon sets, pricing tables, org/flow charts. Take it. A Lolly render is deterministic, brand-enforced by its template, reproducible from its inputs, and it carries an editable link, none of which a hand-drawn file gives you. **Never hand-draw a chart or a QR code** - that is off-brand work you would have to redo.
+
+**2. Lolly renders part, you finish it.** Often the best answer, and the one to reach for before giving up on route 1. Lolly gives you a correct, on-brand base; you add what no template can know: a callout arrow to the bar that matters, an annotation band, a second panel beside the chart, a label in the wiki's own vocabulary. Edit the SVG directly - it is text.
+
+**3. You draw it.** Bespoke structural diagrams no tool covers: a specific architecture, a four-file layout, a conceptual figure, a flow whose shapes carry meaning. Hand-write brand-true SVG per the brand skill's palette, typography and component rules. Say so plainly in your summary when you take this route, so the user knows the visual is not template-guaranteed.
+
+### Choosing, in three commands
+
+Run the `lolly` skill's script (`bun <skills>/lolly/scripts/lolly.ts`). If the skill is not present, route 3 is your only option.
+
+```bash
+bun .../lolly.ts catalog --image <keyword>   # is there a tool for this shape?
+bun .../lolly.ts describe <id>               # its real inputs + AUTHORED EXAMPLES
+bun .../lolly.ts render <id> k=v ... --format=svg -o outputs/assets/<name>.svg
+```
+
+Name the picture you need first ("a ranked comparison of three estates"), then search for that shape. `describe` ends with the tool author's own worked examples - start from the closest one and change the data. **Set the presentation inputs**: a tool called with only its data renders correct but ugly (one flat colour, no title, wrong aspect ratio for the row count), and shipping that is worse than drawing it yourself. The `d3` recipe is in the lolly skill's references/composing.md.
+
+For a visual that is genuinely two tools - a chart on a brand backdrop, a render given a halftone treatment - use `lolly.ts chain`, which pipes one tool's output into the next in one call. Never hand-write a nested embed URL.
+
+### Doing the hybrid
+
+The Lolly SVG is a normal file. Open it, keep its `<svg>` root and `viewBox` intact, and add your own elements after its content so they paint on top:
+
+```
+outputs/assets/grain.svg          <- Lolly's render, untouched root
+outputs/assets/grain.svg.lolly.json  <- keep: holds the editable link and inputs
+```
+
+The lolly skill does the fiddly parts, and works the same for every tool:
+
+```bash
+bun .../lolly.ts probe outputs/assets/chart.svg          # coordinate space + anchors
+bun .../lolly.ts annotate outputs/assets/chart.svg \
+  --layer=layer.svg -o outputs/assets/chart-final.svg [--pad-right=N]
+```
+
+`probe` prints the `viewBox` you must place marks in (a render's outer pixel size often disagrees with it) and lists the shapes worth anchoring to, with their centres. `annotate` appends your group without touching the base and can grow the viewBox to make room for side notes. A text card or a gradient honestly reports **no anchors** - place those against the canvas box.
+
+Working rules for editing a render:
+- **Add, don't rewrite.** Wrap your additions in one `<g id="annotations">` so the Lolly base stays identifiable and can be re-rendered from its sidecar if the data changes.
+- **Match the base.** Pull colours and font-family from the SVG you were given, not from memory - it was generated against the live brand tokens.
+- **Keep the sidecar.** `<file>.lolly.json` carries the editable link and exact inputs. It is how the visual gets regenerated later; deleting it strands the asset.
+- **Re-read the result.** Rasterize or view the finished SVG before it goes in the deck. A chart that renders is not the same as a chart that is good.
+
+### Whichever route
+
+- Assets live in `outputs/assets/`; specs reference them by relative path.
+- New images are generated fresh and context-aware - **never copy a raw-source image**. Use the wiki's image descriptions to inform an improved original.
+- Vector-first, explicit `width`/`height`, and a `viewBox` so the rasterizer scales it cleanly.
+- Facts in a visual obey the content rule: every number traces to a wiki page.
 
 ## Slides
 
@@ -32,7 +91,7 @@ A deck is not a document. The audience reads the slide in one glance and listens
 1. **One idea per slide.** The title is a full-sentence assertion stating the point ("Resident is not sovereign"), never a topic label ("Data residency"). If a slide needs a second sentence to make its point, it is two slides.
 2. **Slides carry evidence, notes carry the talk.** Every content slide gets speaker `notes` with the spoken narrative in the user's voice. On-slide text is what the audience must remember, not what the presenter will say.
 3. **Bullets are a last resort.** Max 5 per slide, aim for 3, each under ~16 words, no sub-clauses. Before writing bullets, ask what would show the point instead: a generated SVG diagram (flows, comparisons, architectures, timelines), a `big-number` slide (any statistic that matters), a `two-col` (any either/or), a `quote` (any citable sentence), an `image` slide.
-4. **Every 2-3 content slides, the audience needs a visual.** Generate SVGs per the brand skill and reference them from the spec (`image` on a content slide puts text left, visual right). The script converts SVG to PNG automatically.
+4. **Every 2-3 content slides, the audience needs a visual.** Source it per "Visuals" above - a Lolly render, a Lolly render you have annotated, or your own SVG, whichever serves the slide - and reference it from the spec (`image` on a content slide puts text left, visual right). The script converts SVG to PNG automatically.
 5. **As few slides as the argument needs - visuals compress.** Slide count comes from the content and the audience's time, never from the layout menu. One good diagram replaces the 3-4 slides that would have explained it; when a visual already carries a point, the slides restating that point are deleted, not kept alongside. A 30-minute talk earns 10-20 slides; a leave-behind argument often fits in 4-6. `section` dividers are for long multi-act talks only - in a short deck they are padding.
 6. **Compression pass before rendering**: for every slide ask "must the audience remember this as its own point?" If no, its content moves into a visual, into another slide's notes, or out. The memorable points of a deck number 3-5; the slide count should not be far above that plus title and closing.
 7. Numbers beat adjectives; if the wiki has the figure, use `big-number`. Left-align, never all-caps (the template enforces fonts and colors).
@@ -50,7 +109,7 @@ Composing a document:
 1. Pick the template with the user ("whitepaper or PoV?" is a real question - the forms argue differently). List `templates/docs/` for what exists.
 2. **Read the template's `structure.md` first** and build the spec's sections to its skeleton. The rules in template.json are enforced by lint; structure.md is enforced by you.
 3. Facts from wiki pages only; cite raw sources in a references section where the form has one.
-4. Visuals follow the slide rules: generate brand-true SVGs for anything structural (the script converts and renders them with the template's fonts); figure density is linted per template.
+4. Visuals follow "Visuals" above: a Lolly render for any shape a tool covers, annotated by you where the figure needs saying more, your own SVG for bespoke structure. Figure density is linted per template - a document under its figure count is usually one that explained in prose what a chart would have shown.
 5. Render, fix every `lint:` line, and re-read the output against voice + quality profiles before delivering. For .md outputs, image links point at the generated assets - keep them inside `outputs/`.
 
 ## Before calling it done
