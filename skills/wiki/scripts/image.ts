@@ -29,6 +29,10 @@ export interface ImageInfo {
   height?: number;
   blank: boolean; // proven single flat colour, safe to skip
   hash: string;
+  /** True only when the bytes prove more than one frame. */
+  animated?: boolean;
+  /** Frames counted, when counting was cheap and certain. */
+  frames?: number;
 }
 
 /** Magic-byte sniffing, only for what Bun.Image (Bun >= 1.4) cannot decode:
@@ -40,6 +44,74 @@ export function formatOf(buf: Buffer): string {
   if (buf.length > 4 && buf.readUInt32LE(0) === 0x9ac6cdd7) return "wmf"; // placeable WMF
   if (buf.length > 4 && buf[0] === 0x01 && buf[1] === 0x00 && buf[2] === 0x09 && buf[3] === 0x00) return "wmf";
   return "unknown";
+}
+
+/**
+ * Does this file actually move? `Bun.Image` reports a GIF's format and size but
+ * says nothing about frames, so a still exported as .gif and a real animation
+ * are indistinguishable to every other check here. That matters when a slide is
+ * supposed to animate: the file arrives, the render log is clean, and the deck
+ * is silently static.
+ *
+ * Counted from the bytes, so there is no ImageMagick (or any other external
+ * tool) to install. Only the three animated formats Lolly exports are handled;
+ * anything else returns `{ animated: false }` with no frame count rather than a
+ * guess.
+ */
+export function animationOf(buf: Buffer): { animated: boolean; frames?: number } {
+  // GIF: frames are Image Descriptor blocks (0x2C). They cannot be found by a
+  // naive byte scan - 0x2C is ordinary pixel data too - so the block chain has
+  // to be walked properly from the end of the header.
+  if (buf.length > 6 && buf.toString("ascii", 0, 3) === "GIF") {
+    let p = 13; // header (6) + logical screen descriptor (7)
+    const flags = buf[10];
+    if (flags === undefined) return { animated: false };
+    if (flags & 0x80) p += 3 * (1 << ((flags & 0x07) + 1)); // global colour table
+    let frames = 0;
+    while (p < buf.length) {
+      const block = buf[p];
+      if (block === 0x3b) break; // trailer
+      if (block === 0x21) {
+        // extension: skip its chain of length-prefixed sub-blocks
+        p += 2;
+        while (p < buf.length && buf[p] !== 0x00) p += buf[p]! + 1;
+        p += 1;
+      } else if (block === 0x2c) {
+        frames++;
+        if (frames > 1) return { animated: true, frames: undefined }; // enough to know
+        const local = buf[p + 9];
+        if (local === undefined) break;
+        p += 10;
+        if (local & 0x80) p += 3 * (1 << ((local & 0x07) + 1)); // local colour table
+        p += 1; // LZW minimum code size
+        while (p < buf.length && buf[p] !== 0x00) p += buf[p]! + 1; // image data sub-blocks
+        p += 1;
+      } else {
+        break; // not a shape we understand; do not guess
+      }
+    }
+    return { animated: frames > 1, frames };
+  }
+
+  // APNG: an `acTL` chunk before the first `IDAT` declares the frame count.
+  if (buf.length > 8 && buf.readUInt32BE(0) === 0x89504e47) {
+    const acTL = buf.indexOf("acTL", 8, "ascii");
+    if (acTL === -1) return { animated: false, frames: 1 };
+    const idat = buf.indexOf("IDAT", 8, "ascii");
+    if (idat !== -1 && idat < acTL) return { animated: false, frames: 1 };
+    const frames = acTL + 8 <= buf.length ? buf.readUInt32BE(acTL + 4) : undefined;
+    return { animated: (frames ?? 2) > 1, frames };
+  }
+
+  // Animated WebP: an `ANIM` chunk in the RIFF container.
+  if (
+    buf.length > 16 && buf.toString("ascii", 0, 4) === "RIFF" &&
+    buf.toString("ascii", 8, 12) === "WEBP"
+  ) {
+    return { animated: buf.indexOf("ANIM", 12, "ascii") !== -1 };
+  }
+
+  return { animated: false };
 }
 
 /** PNG IHDR: width, height, bit depth, colour type. */
@@ -179,6 +251,10 @@ export async function inspectImage(abs: string): Promise<ImageInfo> {
     return info;
   }
 
+  const anim = animationOf(buf);
+  if (anim.animated) info.animated = true;
+  if (anim.frames !== undefined) info.frames = anim.frames;
+
   // Blank check. Fast path: the file is already a PNG our decoder reads.
   // Everything else (jpeg/webp/gif/bmp/tiff/..., palette, 16-bit or interlaced
   // PNGs) is normalised to 8-bit RGBA PNG by Bun.Image first, so the flat-colour
@@ -212,7 +288,10 @@ export function junkReason(
 ): { reason: SkippedEntry["reason"]; detail: string } | null {
   if (UNVIEWABLE_FORMATS.has(info.format))
     return { reason: "unviewable", detail: `${info.format} is a vector format an LLM cannot view` };
-  if (info.blank) return { reason: "blank", detail: "decodes to one flat colour over white" };
+  // Blankness is judged on the first frame only, which an animation's opening
+  // frame is entitled to be - a build-on chart starts on empty axes. Skipping it
+  // would throw away the whole animation on the strength of one frame.
+  if (info.blank && !info.animated) return { reason: "blank", detail: "decodes to one flat colour over white" };
   if (info.width && info.height && Math.max(info.width, info.height) < TINY_LONG_SIDE_PX)
     return {
       reason: "tiny",

@@ -127,8 +127,13 @@ for (const i of toView) {
     lastSource = i.source;
   }
   const dim = i.width ? `${i.width}x${i.height}` : "?";
+  // Say when a file moves. Viewing it shows one frame, so without this an
+  // animation reads as an ordinary still and gets described as one.
+  const motion = i.animated
+    ? ` · ANIMATED${i.frames ? ` (${i.frames} frames)` : ""} - a view shows frame 1 only`
+    : "";
   console.log(`  ${i.abs}`);
-  console.log(`      ${i.format} · ${dim} · ${i.bytes.toLocaleString()} B`);
+  console.log(`      ${i.format} · ${dim} · ${i.bytes.toLocaleString()} B${motion}`);
 }
 
 if (dupGroups.length) {

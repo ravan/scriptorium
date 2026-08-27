@@ -92,6 +92,7 @@ if (existsSync(templatePath)) {
 for (const f of [
   "common.ts",
   "image.ts",
+  "image.test.ts",
   "doctor.ts",
   "setup.ts",
   "ingest.ts",

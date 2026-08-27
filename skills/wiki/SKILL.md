@@ -50,7 +50,7 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 | `ingest.ts [--dry-run] [--re-extract <file>]` | scan raw/, update manifest, extract text+media to derived/; junk images (blank/tiny/duplicate/unviewable) are gated into `skipped/` with a `skipped.json` note |
 | `manifest.ts status\|pending\|mark-ingested` | inspect and update ingest state |
 | `outline.ts [slug\|--all]` | heading map + `sed` read plan for extracted text too big to `cat` |
-| `media.ts [slug\|--all]` | inventory of images worth viewing: absolute paths, sizes; junk appears only as counts |
+| `media.ts [slug\|--all]` | inventory of images worth viewing: absolute paths, sizes; junk appears only as counts. Marks animated gif/apng/webp `ANIMATED` - viewing one shows frame 1 only |
 | `links.ts [--quiet]` | verify every relative link resolves; regenerate `wiki/index.json` + `wiki/map.json`; exit 1 if broken |
 | `wiki.ts find\|page\|hubs\|clusters\|orphans\|recent\|log\|render` | query the catalog/graph/log in slices; append log entries; render human reading copies to `outputs/` |
 | `clean.ts [--apply]` | reclaim disk: delete gated junk, PDF page renders and unreferenced media of ingested sources (dry run by default) |
@@ -61,3 +61,11 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 Spec JSON shapes are documented in the header comments of the two compose scripts.
 
 **Existing wiki missing a script?** Re-run `setup.ts` on it. It overwrites `scripts/` only and never touches your content.
+
+## Tests
+
+```bash
+bun test scripts/image.test.ts    # 19 tests, offline, no external tools
+```
+
+Covers the byte-level image checks, chiefly animation detection for gif/apng/webp. It needs no ImageMagick and no Chrome: the fixtures are built in the test, so a failure always means the parser broke. Run it after any change to `image.ts`.

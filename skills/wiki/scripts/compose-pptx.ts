@@ -23,6 +23,9 @@
 //   ]
 // }
 // Every slide accepts "notes": the spoken narrative lives there, not on the slide.
+// "title", "section" and "closing" also accept "background": { "path": "..." } - a full-bleed
+// image painted behind the text. On a title slide it replaces the template cover panel and
+// switches the text to the light-on-dark colours, so use a dark image.
 // Image paths may be .svg (converted to PNG automatically), .png or .jpg.
 //
 // Templates live in templates/slides/<name>/template.json (wiki copy first, skill copy as
@@ -137,6 +140,16 @@ async function slideImage(rel: string): Promise<string> {
   const abs = isAbsolute(rel) ? rel : resolve(specDir, rel);
   if (!existsSync(abs)) throw new Error("image not found: " + abs);
   return rasterize(abs);
+}
+
+// Full-bleed background image for the title/section/closing layouts. Painted first so
+// every other object on the slide lands on top of it.
+async function addBackground(slide: any, s: any, reLogo = false): Promise<boolean> {
+  if (!s.background?.path) return false;
+  slide.addImage({ path: await slideImage(s.background.path), x: 0, y: 0, w: 13.33, h: 7.5 });
+  // The image covers the master's footer objects, so put the corner logo back on top.
+  if (reLogo && logoDark) slide.addImage({ path: logoDark, x: 0.8, y: 7.14, w: 0.72, h: 0.72 / LOGO_AR });
+  return true;
 }
 
 // Fit an image inside a box preserving its aspect ratio, centered. Computed here
@@ -258,21 +271,27 @@ for (const s of spec.slides ?? []) {
 
   if (layout === "title") {
     const slide = pptx.addSlide({ masterName: "PLAIN" });
-    const textW = cover ? 6.9 : 11.7;
+    const onDark = await addBackground(slide, s);
+    const logo = onDark ? logoDark : logoLight;
+    const titleColor = onDark ? C.sectionText : C.heading;
+    const bodyColor = onDark ? C.sectionText : C.text;
+    const mutedColor = onDark ? C.sectionMuted : C.muted;
+    const textW = cover && !onDark ? 6.9 : 11.7;
     // Cover asset must be pre-cropped to the panel ratio (4.93:7.5); it is placed 1:1.
-    if (cover) slide.addImage({ path: cover, x: 8.4, y: 0, w: 4.93, h: 7.5 });
-    if (logoLight) slide.addImage({ path: logoLight, x: 0.8, y: 0.55, w: 1.66, h: 1.66 / LOGO_AR });
+    if (cover && !onDark) slide.addImage({ path: cover, x: 8.4, y: 0, w: 4.93, h: 7.5 });
+    if (logo) slide.addImage({ path: logo, x: 0.8, y: 0.55, w: 1.66, h: 1.66 / LOGO_AR });
     slide.addShape("rect", { x: 0.8, y: 2.95, w: 1.6, h: 0.12, fill: { color: C.accent } });
-    slide.addText(s.title ?? "", { x: 0.8, y: 3.15, w: textW, h: 1.9, fontFace: HEAD, fontSize: 40, bold: true, color: C.heading, valign: "top" });
-    if (s.subtitle) slide.addText(s.subtitle, { x: 0.8, y: 5.05, w: textW, h: 0.9, fontFace: BODY, fontSize: 18, color: C.text, valign: "top" });
+    slide.addText(s.title ?? "", { x: 0.8, y: 3.15, w: textW, h: 1.9, fontFace: HEAD, fontSize: 40, bold: true, color: titleColor, valign: "top" });
+    if (s.subtitle) slide.addText(s.subtitle, { x: 0.8, y: 5.05, w: textW, h: 0.9, fontFace: BODY, fontSize: 18, color: bodyColor, valign: "top" });
     const byline = [s.author ?? spec.author, s.date].filter(Boolean).join("  ·  ");
-    if (byline) slide.addText(byline, { x: 0.8, y: 6.7, w: textW, h: 0.4, fontFace: BODY, fontSize: 12, color: C.muted });
+    if (byline) slide.addText(byline, { x: 0.8, y: 6.7, w: textW, h: 0.4, fontFace: BODY, fontSize: 12, color: mutedColor });
     if (s.notes) slide.addNotes(s.notes);
     continue;
   }
 
   if (layout === "section") {
     const slide = pptx.addSlide({ masterName: "SECTION" });
+    await addBackground(slide, s, true);
     if (s.kicker) slide.addText(s.kicker, { x: 0.8, y: 2.35, w: 11.7, h: 0.4, fontFace: BODY, fontSize: 14, color: C.sectionMuted });
     slide.addShape("rect", { x: 0.8, y: 2.9, w: 1.6, h: 0.12, fill: { color: C.accent } });
     slide.addText(s.title ?? "", { x: 0.8, y: 3.1, w: 11.7, h: 1.7, fontFace: HEAD, fontSize: 34, bold: true, color: C.sectionText, valign: "top" });
@@ -283,6 +302,7 @@ for (const s of spec.slides ?? []) {
 
   if (layout === "closing") {
     const slide = pptx.addSlide({ masterName: "SECTION" });
+    await addBackground(slide, s);
     if (logoDark) slide.addImage({ path: logoDark, x: 5.47, y: 2.35, w: 2.4, h: 2.4 / LOGO_AR });
     slide.addText(s.title ?? "Thank you", { x: 0.8, y: 3.6, w: 11.7, h: 1.0, align: "center", fontFace: HEAD, fontSize: 30, bold: true, color: C.sectionText });
     if (s.subtitle) slide.addText(s.subtitle, { x: 0.8, y: 4.6, w: 11.7, h: 0.6, align: "center", fontFace: BODY, fontSize: 15, color: C.sectionMuted });
