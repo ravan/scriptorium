@@ -68,7 +68,7 @@ import { join } from "node:path";
 import {
   GET_FORMATS, UsageError,
   annotateSvg, cacheKey, exportTimeoutMs, findAnchors, formatCatalog, formatDescribe,
-  formatProbe, formatToolList, parseArgs, pickFormat, planChain, query, shareLink,
+  formatProbe, formatToolList, parseArgs, pickFormat, planChain, planFinish, query, shareLink,
   splitChainSegments, validateInputs,
   type ChainStepSpec, type Inputs, type Manifest, type Tool,
 } from "./lolly-core.ts";
@@ -413,8 +413,46 @@ async function main(): Promise<void> {
     for (const line of plan.progress) console.error(line);
     const last = plan.steps[plan.steps.length - 1]!;
     await renderTo(last.id, last.inputs, last.finalFormat!, out);
+  } else if (cmd === "finish") {
+    // Repair an animated export: put a ground behind it, and give it a codec
+    // that plays. See planFinish for why both are needed.
+    const [file] = positional;
+    if (!file) {
+      throw new UsageError("Usage: finish <in.gif> [--ground <hex> -o <out.gif>] [--mp4 <out.mp4>] [--width N]");
+    }
+    if (!existsSync(file)) throw new UsageError(`No such file: ${file}`);
+    const plan = planFinish({
+      input: file,
+      ground: flags.ground,
+      out: flags.output,
+      mp4: flags.mp4,
+      width: flags.width === undefined ? undefined : Number(flags.width),
+    });
+    for (const tool of plan.needs) {
+      if (!Bun.which(tool)) {
+        throw new UsageError(`finish needs ${tool}. Install it: brew install ${tool === "magick" ? "imagemagick" : "ffmpeg"}`);
+      }
+    }
+    for (const argv of [plan.magick, plan.ffmpeg]) {
+      if (!argv) continue;
+      const proc = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" });
+      if (proc.exitCode !== 0) {
+        console.error(proc.stderr.toString());
+        throw new Error(`finish: ${argv[0]} failed`);
+      }
+      console.log(`ran ${argv[0]} -> ${argv[argv.length - 1]}`);
+    }
+    // The sidecar is how the visual gets regenerated later, so carry it across
+    // to every file this command produced.
+    const sidecar = `${file}.lolly.json`;
+    if (existsSync(sidecar)) {
+      for (const made of [plan.magick?.at(-1), plan.ffmpeg?.at(-1)].filter(Boolean) as string[]) {
+        if (made !== file) await Bun.write(`${made}.lolly.json`, Bun.file(sidecar));
+      }
+      console.log("copied the editable link sidecar onto the new file(s)");
+    }
   } else {
-    throw new UsageError("Usage: lolly.ts catalog|tools|describe|assets|url|render|chain|probe|annotate ... (see header comment)");
+    throw new UsageError("Usage: lolly.ts catalog|tools|describe|assets|url|render|chain|probe|annotate|finish ... (see header comment)");
   }
 }
 

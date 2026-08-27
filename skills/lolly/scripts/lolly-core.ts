@@ -823,3 +823,85 @@ export function formatDescribe(m: Manifest): string[] {
   }
   return lines;
 }
+
+// ── finish: repairing an animated export ────────────────────────────────────
+
+export interface FinishOpts {
+  input: string;
+  /** Hex colour to put behind a transparent animation, with or without "#". */
+  ground?: string;
+  /** Where the repaired animation goes. Required when `ground` is set. */
+  out?: string;
+  /** Also write an H.264 mp4 here. */
+  mp4?: string;
+  /** Output width in pixels for the mp4. Height follows the aspect ratio. */
+  width?: number;
+}
+
+export interface FinishPlan {
+  magick: string[] | null;
+  ffmpeg: string[] | null;
+  needs: string[];
+}
+
+/**
+ * Two facts about Lolly's animated exports, both verified rather than assumed:
+ *
+ * 1. `d3` and `mesh-gradient` ignore the `background` input when the format is
+ *    gif/mp4/webm and render on transparency, which reads as black everywhere it
+ *    lands. The same inputs at `--format=svg` honour the background, so this is
+ *    a property of the animated export path and not of the arguments.
+ * 2. their `mp4` is AV1, which most players and PowerPoint will not open.
+ *
+ * Both are fixable after the render and neither is worth rediscovering. This
+ * builds the commands; the caller runs them.
+ */
+export function planFinish(o: FinishOpts): FinishPlan {
+  if (!o.ground && !o.mp4) {
+    throw new UsageError("finish: give --ground <hex>, --mp4 <file>, or both. Nothing to do otherwise.");
+  }
+
+  let magick: string[] | null = null;
+  if (o.ground) {
+    const hex = o.ground.replace(/^#/, "");
+    // Never hand an unvalidated string to a command line.
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+      throw new UsageError(`finish: --ground must be a 6-digit hex colour, got "${o.ground}"`);
+    }
+    if (!o.out) throw new UsageError("finish: --ground needs -o <out.gif> to write to.");
+    magick = [
+      "magick", o.input,
+      // A GIF frame is a delta on the one before it, so every frame has to be
+      // made whole before any of them can be recoloured.
+      "-coalesce",
+      // The transparent ground arrives as pure black with compression noise
+      // around it, so an exact match leaves a fringe.
+      "-fuzz", "12%", "-fill", `#${hex}`, "-opaque", "black",
+      "-layers", "optimize",
+      o.out,
+    ];
+  }
+
+  let ffmpeg: string[] | null = null;
+  if (o.mp4) {
+    // Read from the repaired file when there is one; the original still has the
+    // transparent ground this whole command exists to remove.
+    const src = o.ground ? o.out! : o.input;
+    ffmpeg = [
+      "ffmpeg", "-y", "-loglevel", "error", "-i", src,
+      // yuv420p and even dimensions are what makes the file play in QuickTime,
+      // PowerPoint and every browser rather than only in ffplay.
+      "-pix_fmt", "yuv420p",
+      "-vf", `scale=${o.width ?? 1280}:-2:flags=lanczos`,
+      "-c:v", "libx264", "-crf", "20", "-r", "25",
+      "-movflags", "+faststart",
+      o.mp4,
+    ];
+  }
+
+  return {
+    magick,
+    ffmpeg,
+    needs: [...(magick ? ["magick"] : []), ...(ffmpeg ? ["ffmpeg"] : [])],
+  };
+}

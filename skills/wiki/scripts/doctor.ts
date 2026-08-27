@@ -42,12 +42,26 @@ const checks: Check[] = [
     required: true,
   },
   {
+    cmd: "magick",
+    why: "samples animation frames and resizes stills for preview.ts",
+    install: "brew install imagemagick",
+    required: false,
+  },
+  {
     cmd: "git",
     why: "keeps version history of the wiki",
     install: "macOS: xcode-select --install",
     required: false,
   },
 ];
+
+// A deck previewer: LibreOffice is headless and works anywhere; Keynote is the
+// macOS fallback. Without one of them a .pptx cannot be looked at, and looking
+// at it is the only way to know a slide is readable.
+function haveDeckRenderer(): boolean {
+  const { existsSync } = require("node:fs");
+  return have("soffice") || have("libreoffice") || existsSync("/Applications/Keynote.app");
+}
 
 // Chrome/Chromium: only needed to render PDFs (compose-doc.ts); .md/.docx work without it.
 function haveChrome(): boolean {
@@ -66,6 +80,13 @@ function haveChrome(): boolean {
 // Bun itself: 1.4+ is the floor (the scripts use Bun.Image for junk detection).
 const bunOk = typeof Bun.Image === "function";
 const results = [
+  {
+    cmd: "deck renderer",
+    why: "turns a .pptx into pictures so preview.ts can show you the slides",
+    install: "brew install --cask libreoffice, or install Keynote on macOS",
+    required: false,
+    found: haveDeckRenderer(),
+  },
   {
     cmd: "chrome",
     why: "turns documents into PDF files (only needed for .pdf output)",

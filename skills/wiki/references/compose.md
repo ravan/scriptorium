@@ -100,6 +100,38 @@ A deck is not a document. The audience reads the slide in one glance and listens
 
 Then `bun scripts/compose-pptx.ts <spec> -o outputs/<name>.pptx`, fix lint warnings, and tell the user it imports into Google Slides via File > Import (fonts must be installed on the viewing machine; the SUSE font is on Google Fonts).
 
+### Before you call a deck done
+
+A clean render log is not evidence. pptxgenjs reports success for a slide whose
+image resolved to nothing, and an animated GIF can arrive flattened. Three scripts
+settle the mechanical half, in this order:
+
+```bash
+bun scripts/voice-lint.ts outputs/<name>.spec.json          # the words
+bun scripts/verify-pptx.ts outputs/<name>.pptx outputs/<name>.spec.json   # the file
+bun scripts/preview.ts outputs/<name>.pptx -o /tmp/preview  # the slides
+```
+
+- **`voice-lint.ts`** reads the kill list out of the wiki's own `profile/voice.md`
+  and checks what a regex can settle. It catches captions and bullets, which is
+  where a hand check misses things. Exit 2 means a hard rule was broken.
+- **`verify-pptx.ts`** opens the deck and reports media per slide, whether notes
+  arrived, whether an animation kept its frames, and any image the spec asked for
+  that is not there. It also warns when a visual fills far less of its slot than
+  the slot offered, which is what a chart looks like just before its type becomes
+  unreadable.
+- **`preview.ts`** writes one PNG per slide through LibreOffice or Keynote. Read
+  them back as images. Every one, not a sample.
+
+**Never substitute an SVG preview for a slide preview.** Rasterising the source
+asset with resvg is not the same engine and silently drops shapes PowerPoint
+draws correctly, rotated ones especially. A visual that looks broken in an SVG
+preview may be fine on the slide, and the only way to know is to build the deck
+and look at it. `preview.ts` says so when you point it at an `.svg`.
+
+None of this judges whether the deck is any good. Scene, callback, evidence next
+to its claim, and whether a slide earns its place are still yours.
+
 ## Documents
 
 Long-form artifacts use the same machinery as slides: a template folder owns the look, a spec JSON owns the content, one script renders it - `bun scripts/compose-doc.ts <spec> -o outputs/<name>.md|.docx|.pdf` (spec shape in the script header). Same output from the same spec in all three formats; .pdf needs Chrome/Chromium on the machine (doctor.ts checks), .md and .docx need nothing.

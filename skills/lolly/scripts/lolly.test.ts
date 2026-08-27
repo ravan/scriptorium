@@ -25,6 +25,7 @@ import {
   annotateSvg, cacheKey, embedUrl, exportTimeoutMs, filterTools, findAnchors,
   formatCatalog, formatDescribe, formatProbe, formatToolList, isImageTool, matchesTool,
   padViewBox, parseArgs, parseViewBox, pathBBox, pickChildFormat, pickFormat, planChain,
+  planFinish,
   query, readGeometry, shareLink, splitChainSegments, validateInputs,
   type ChainStepSpec, type Manifest, type Tool,
   parseSlotRef,
@@ -1243,5 +1244,63 @@ describe("cli", () => {
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }
+  });
+});
+
+// ── finish: repairing an animated export ────────────────────────────────────
+//
+// `d3` and `mesh-gradient` export gif/mp4 through a path that ignores the
+// `background` input and encodes mp4 as AV1. Both are fixable after the render,
+// deterministically, and both were found the hard way. The plan is built here so
+// the fix is a command rather than a memory.
+describe("planFinish", () => {
+  test("fills the transparent ground with the colour asked for", () => {
+    const p = planFinish({ input: "a.gif", ground: "0c322c", out: "b.gif" });
+    expect(p.magick).not.toBeNull();
+    expect(p.magick!.join(" ")).toContain("#0c322c");
+    expect(p.magick!).toContain("a.gif");
+    expect(p.magick!.at(-1)).toBe("b.gif");
+  });
+
+  test("coalesces first, because a gif frame is a delta on the one before it", () => {
+    const p = planFinish({ input: "a.gif", ground: "0c322c", out: "b.gif" });
+    const i = p.magick!.indexOf("-coalesce");
+    expect(i).toBeGreaterThan(-1);
+    expect(i).toBeLessThan(p.magick!.indexOf("-opaque"));
+  });
+
+  test("accepts a hex with or without the hash", () => {
+    expect(planFinish({ input: "a.gif", ground: "#0c322c", out: "b.gif" }).magick!.join(" "))
+      .toContain("#0c322c");
+  });
+
+  test("rejects anything that is not a hex colour rather than passing it to the shell", () => {
+    expect(() => planFinish({ input: "a.gif", ground: "green; rm -rf /", out: "b.gif" })).toThrow();
+  });
+
+  test("no ground means no magick step", () => {
+    expect(planFinish({ input: "a.gif", mp4: "a.mp4" }).magick).toBeNull();
+  });
+
+  test("an mp4 target produces an H.264 plan, because the native export is AV1", () => {
+    const p = planFinish({ input: "a.gif", mp4: "a.mp4" });
+    expect(p.ffmpeg!.join(" ")).toContain("libx264");
+    expect(p.ffmpeg!.join(" ")).toContain("yuv420p");
+    expect(p.ffmpeg!.at(-1)).toBe("a.mp4");
+  });
+
+  test("the mp4 is built from the repaired gif, not the transparent original", () => {
+    const p = planFinish({ input: "a.gif", ground: "0c322c", out: "b.gif", mp4: "a.mp4" });
+    expect(p.ffmpeg!).toContain("b.gif");
+    expect(p.ffmpeg!).not.toContain("a.gif");
+  });
+
+  test("asking for nothing at all is a usage error", () => {
+    expect(() => planFinish({ input: "a.gif" })).toThrow();
+  });
+
+  test("names the tools it needs so a missing one is reported, not guessed at", () => {
+    expect(planFinish({ input: "a.gif", ground: "0c322c", out: "b.gif", mp4: "a.mp4" }).needs.sort())
+      .toEqual(["ffmpeg", "magick"]);
   });
 });

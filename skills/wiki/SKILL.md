@@ -57,6 +57,9 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 | `compose-pptx.ts <spec.json> -o out.pptx` | render slide spec to branded .pptx via a template from `templates/slides/` (Google Slides importable); prints `lint:` warnings against the slide rules in references/compose.md |
 | `compose-doc.ts <spec.json> -o out.(md\|docx\|pdf)` | render a document spec through a `templates/docs/` template (whitepaper, pov, amazon-6pager, ...); lints against the template's word/bullet/figure rules; pdf needs Chrome |
 | `compose-docx.ts <spec.json> -o out.docx` | back-compat shim over compose-doc.ts |
+| `verify-pptx.ts <deck.pptx> [spec.json]` | open the rendered deck and report what is really inside it: media per slide, notes, animation, and every image the spec asked for that did not arrive. Exit 2 on a problem |
+| `preview.ts <file> [-o dir] [--pages 1-4]` | turn a .pptx, .pdf, .svg or .gif into PNGs to read back as images. Decks go through LibreOffice or Keynote, the engines that will actually show them |
+| `voice-lint.ts <file.md \| spec.json>` | the mechanical half of `profile/voice.md`: connector dashes, sentences over one comma, kill-list words, emoji, long paragraphs. Reads the kill list from the wiki's own profile. Exit 2 on a hard-rule finding |
 
 Spec JSON shapes are documented in the header comments of the two compose scripts.
 
@@ -65,7 +68,7 @@ Spec JSON shapes are documented in the header comments of the two compose script
 ## Tests
 
 ```bash
-bun test scripts/image.test.ts    # 19 tests, offline, no external tools
+bun test scripts/                 # 110 tests, offline, no external tools
 ```
 
 Covers the byte-level image checks, chiefly animation detection for gif/apng/webp. It needs no ImageMagick and no Chrome: the fixtures are built in the test, so a failure always means the parser broke. Run it after any change to `image.ts`.

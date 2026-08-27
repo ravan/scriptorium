@@ -46,6 +46,7 @@ bun scripts/lolly.ts chain <id> k=v ... --then <id>:<slot> k=v ... -o out.png   
 bun scripts/lolly.ts url <id> k=v ...         # the editable link, no render
 bun scripts/lolly.ts probe <file.svg>         # a render's coordinate space + its anchors
 bun scripts/lolly.ts annotate <base.svg> --layer=<file|-> -o out.svg [--pad-right=N]
+bun scripts/lolly.ts finish <in.gif> [--ground=<hex> -o out.gif] [--mp4=out.mp4]   # repair an animated export
 ```
 
 **Annotating a render works the same for every tool**: `render --format=svg`, `probe` it to learn the coordinate space and the shapes worth aiming at, then `annotate` to lay your own group over an untouched base. That is how a generated chart or diagram gains the callout, badge or side note a template cannot know. See references/composing.md, "The hybrid, for any tool".
@@ -111,6 +112,43 @@ chart because the PDF of the same inputs did.
 
 Chain steps by need: make (`d3`, `qr-code`, `mesh-gradient`, `growth`) → treat (`filter`, `darkroom`) → place in a scene (`screenshot-frame`, `booth-studio`, `print-sheet`, `link-card`, `quotes` bgImage) → animate/export video (`flythrough`, `top-tail-recorder`, `audiogram`). Which tools take asset inputs is in references/composing.md, and `chain` names them for you when you get the slot wrong. Chains with script-drawn or brand-pack children go to the browser tier automatically. `annotate` takes a device file, not a URL - put callouts in the parent tool's own text inputs instead.
 
+## Verified tool limits
+
+Found by hitting them, not by reading docs. Each one costs an hour to rediscover.
+
+**Animated exports ignore `background` and land on transparency.** `d3` and
+`mesh-gradient` honour the input at `--format=svg` and drop it for `gif`, `mp4`
+and `webm`, so the render arrives on black wherever you put it. Their `mp4` is
+also AV1, which PowerPoint and QuickTime will not open. Both are fixed after the
+render, in one command:
+
+```bash
+bun scripts/lolly.ts finish scores.gif --ground=0c322c -o scores.pine.gif --mp4=scores.mp4
+```
+
+It coalesces the frames before recolouring (a GIF frame is a delta on the one
+before it), encodes H.264 with `yuv420p`, and copies the `.lolly.json` sidecar
+onto everything it makes. Say in your summary that you post-processed, and why.
+
+**`org-chart` only draws `card` and `text` from a URL.** Its `path` and `box`
+primitives render nothing, and `bindStart`/`bindEnd` with `route=elbow` draws
+nothing either, whatever geometry you give them. Connectors have to be thin
+rotated `card` shapes (`shape=pill`, `h=8..10`, `rot=<angle>`), which do render.
+The `{w200|...}` weight markup only works on the `row`, `stacked` and `icon`
+layouts, and all three add an avatar circle; `layout=plain` is clean but renders
+the markup literally, so split a title and its detail into two boxes instead.
+
+**`chain` children have a hard 4096-character cap.** The whole pipeline is one
+URL, so a large `blocks` payload as a child fails server-side with
+`{"error":"Query too long (max 4096 characters)."}`. A ten-card `org-chart` is
+already too big to be chained. Render it on its own and place it as a file.
+
+**Not every `asset` input accepts a chained child.** Verified working:
+`quotes:bgImage`, `screenshot-frame:image`. Verified failing: `filter:image`,
+which renders a "Could not read this image" placeholder instead of the child, at
+full size and with no error. Look at the output rather than trusting the exit
+code, because that failure is silent.
+
 ## Hard rules
 
 1. **Describe before render** - input ids come from the manifest, never from memory.
@@ -152,6 +190,11 @@ See references/composing.md for the routing table (need → tool), asset-input c
 | `"deck" is a <blocks> list` when chaining a chart onto a slide | Name the record and field: `deck-studio:deck.0.visual`. |
 | `no matches found: deck-studio:deck[0].visual` | That is your shell globbing. Use the dotted form `deck.0.visual`. |
 | Shipping the default render | Set the presentation inputs, start from an authored example, then look at the file. |
+| An animated gif or mp4 comes out on a black ground | The animated export path ignores `background`. Fix it with `finish --ground=<hex>`. |
+| The mp4 will not play in PowerPoint or QuickTime | The native export is AV1. `finish --mp4=<file>` re-encodes it as H.264. |
+| `Query too long (max 4096 characters)` from a chain | A `blocks` payload is too big to be a chain child. Render that step on its own. |
+| A chained child renders as "Could not read this image" | That parent's asset input does not take a child. `quotes:bgImage` and `screenshot-frame:image` do. |
+| `org-chart` connectors draw nothing | Its `path` and `box` primitives do not render from a URL. Use a thin rotated `card` with `shape=pill`. |
 | Passing a long render URL around instead of the file | The path is the handoff; the link is in `<file>.lolly.json`. |
 | `"imageFraming" is not an input` | It is a `vector` - pass its fields dotted: `imageFraming.zoom=140`. |
 | Embedding an unpinned hot-link URL in a doc | Add `_v=` (from `catalog`) so output can't drift. |
