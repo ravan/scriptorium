@@ -11,6 +11,7 @@ The agent maintains it; the human curates sources and asks questions.
 - **doc templates**: folders under `templates/docs/` (whitepaper, pov, amazon-6pager, ...). Each is a document type: `template.json` styles and lints it, `structure.md` is its required skeleton. Chosen per request, not globally; renders to .md, .docx or .pdf via `compose-doc.ts`
 - **voice**: `profile/voice.md` (governs the words of every composed output; if missing, offer the profile interview)
 - **quality**: `profile/quality-and-style.md` (governs structure and QA checks of composed outputs)
+- **bundled skills**: `ls .claude/skills/` - the skills this wiki carries with it, so a session started in this folder can load them by name with no global install. If a skill named above is missing there, re-run setup with `--bundle-skills <name>` rather than working around its absence.
 
 ## The three layers
 

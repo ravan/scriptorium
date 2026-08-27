@@ -46,7 +46,7 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 | Script | Job |
 |---|---|
 | `doctor.ts` | check required tools, print plain-language install hints |
-| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>]` | scaffold/repair a wiki, idempotent; refreshes `scripts/` and `templates/slides/` |
+| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>] [--bundle-skills a,b]` | scaffold/repair a wiki, idempotent; refreshes `scripts/`, `templates/` and any bundled skills |
 | `ingest.ts [--dry-run] [--re-extract <file>]` | scan raw/, update manifest, extract text+media to derived/; junk images (blank/tiny/duplicate/unviewable) are gated into `skipped/` with a `skipped.json` note |
 | `manifest.ts status\|pending\|mark-ingested` | inspect and update ingest state |
 | `outline.ts [slug\|--all]` | heading map + `sed` read plan for extracted text too big to `cat` |

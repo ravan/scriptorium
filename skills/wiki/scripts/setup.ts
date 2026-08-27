@@ -12,7 +12,7 @@ function arg(flag: string): string | undefined {
 
 const target = process.argv[2];
 if (!target || target.startsWith("--")) {
-  console.error('Usage: bun setup.ts <wiki-folder> --name "My Wiki" [--brand <brand-skill-name>] [--slide-template <template-name>]');
+  console.error('Usage: bun setup.ts <wiki-folder> --name "My Wiki" [--brand <brand-skill-name>] [--slide-template <template-name>] [--bundle-skills lolly,suse-brand]');
   process.exit(1);
 }
 
@@ -21,6 +21,12 @@ const name = arg("--name") ?? root.split("/").pop() ?? "wiki";
 const brand = arg("--brand") ?? "none";
 const slideTemplate = arg("--slide-template") ?? (brand.includes("suse") ? "suse-sovereign" : "neutral");
 const skillRoot = resolve(import.meta.dir, "..");
+// Sibling skills live beside this one, wherever the wiki skill itself is installed.
+const skillsRoot = resolve(skillRoot, "..");
+const bundleSkills = (arg("--bundle-skills") ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 const today = new Date().toISOString().slice(0, 10);
 const made: string[] = [];
 
@@ -121,7 +127,49 @@ for (const kind of ["slides", "docs", "shared"]) {
   cpSync(srcTpl, dstTpl, { recursive: true });
   made.push(`templates/${kind}/` + (fresh ? "" : " (refreshed)"));
 }
-ensureFile(".gitignore", "scripts/node_modules/\n.DS_Store\n");
+// 5c. Bundle the skills this wiki depends on into .claude/skills/, so a Claude
+// Code session started INSIDE the wiki folder finds them. Without this the wiki
+// references a visuals or brand skill it cannot load, and composing fails with
+// "the lolly skill could not be found" - the wiki is only self-contained if its
+// skills travel with it. Skill-owned, so refreshed like the scripts.
+for (const s of bundleSkills) {
+  const src = join(skillsRoot, s);
+  if (!existsSync(src)) {
+    console.warn(`warning: skill "${s}" not found at ${src}; not bundled.`);
+    continue;
+  }
+  const dst = join(root, ".claude", "skills", s);
+  const fresh = !existsSync(dst);
+  cpSync(src, dst, {
+    recursive: true,
+    // Caches and installed dependencies are machine-local and can be large;
+    // the skill regenerates both on first use.
+    filter: (from) => !/(^|\/)(node_modules|\.cache|\.git)(\/|$)/.test(from),
+  });
+  made.push(`.claude/skills/${s}/` + (fresh ? "" : " (refreshed)"));
+}
+
+// The ignore list grows as the wiki gains parts, so append what is missing
+// rather than skipping an existing file: an older wiki would otherwise commit a
+// bundled skill's node_modules the first time it bundles one.
+{
+  const rel = ".gitignore";
+  const p = join(root, rel);
+  const wanted = [
+    "scripts/node_modules/",
+    ".claude/skills/*/node_modules/",
+    ".claude/skills/*/.cache/",
+    ".DS_Store",
+  ];
+  const existing = existsSync(p) ? readFileSync(p, "utf8") : "";
+  const lines = new Set(existing.split("\n").map((l) => l.trim()));
+  const missing = wanted.filter((w) => !lines.has(w));
+  if (missing.length) {
+    const sep = existing && !existing.endsWith("\n") ? "\n" : "";
+    writeFileSync(p, existing + sep + missing.join("\n") + "\n");
+    made.push(rel + (existing ? " (updated)" : ""));
+  }
+}
 
 // 6. Install script dependencies
 if (existsSync(join(root, "scripts", "package.json"))) {
