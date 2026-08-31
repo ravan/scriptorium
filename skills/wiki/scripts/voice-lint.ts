@@ -1,12 +1,14 @@
 #!/usr/bin/env bun
-// Checks a draft against the mechanical half of profile/voice.md and
-// profile/quality-and-style.md. Run it before you call a composed piece done.
+// Checks a draft against the mechanical half of the wiki's idiolect voice
+// profile. Run it before you call a composed piece done.
 //
 // Usage:
-//   bun voice-lint.ts <file.md | spec.json> [more files...] [--json] [--profile <voice.md>]
+//   bun voice-lint.ts <file.md | spec.json> [more files...] [--json] [--profile <profile-dir | ban-list.md>]
 //
-// It reads the kill list out of the wiki's own profile/voice.md, so the words
-// it bans are the user's words and not a list baked in here.
+// It reads the banned words out of the active idiolect profile's ban-list.md
+// (profiles/<name>/, named by the wiki CLAUDE.md voice_profile key), so the
+// words it bans are the owner's words and not a list baked in here. Legacy
+// wikis with a profile/voice.md kill list still work.
 //
 // What it settles: connector dashes, more than one comma in a sentence,
 // kill-list words, emoji, paragraphs over three sentences.
@@ -17,8 +19,8 @@
 // clean run here is necessary and never sufficient.
 //
 // Exit codes: 0 clean, 2 hard-rule findings, 1 usage error.
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { basename, join } from "node:path";
 import { findWikiRoot } from "./common";
 
 // ── types ───────────────────────────────────────────────────────────────────
@@ -188,6 +190,55 @@ export function parseKillList(voiceMd: string): string[] {
   return words.size ? [...words] : [...DEFAULT_KILL_LIST];
 }
 
+/**
+ * Reads an idiolect profile's ban-list.md: bullets only, one banned form per
+ * bullet, scope note after a spaced dash. Prose outside bullets is ignored, as
+ * the idiolect template promises scanners will. Template placeholders in angle
+ * brackets are skipped. An empty parse falls back to DEFAULT_KILL_LIST, same
+ * as a wiki with no profile at all.
+ */
+export function parseBanList(banMd: string): string[] {
+  const words = new Set<string>();
+  for (const rawLine of banMd.split("\n")) {
+    const line = rawLine.trim();
+    if (!/^[-*+]\s/.test(line)) continue;
+    // "- term — reason; replacement" -> "term"
+    const entry = line
+      .replace(/^[-*+]\s+/, "")
+      .split(/\s+(?:—|–|--?)\s+/)[0]!
+      .replace(/[".*_`]/g, "")
+      .trim()
+      .replace(/\.$/, "")
+      .toLowerCase();
+    if (!entry || entry.includes("<")) continue; // unfilled template placeholder
+    if (entry.split(/\s+/).length > 6) continue;
+    if (!/[a-z]/.test(entry)) continue;
+    words.add(entry);
+  }
+  return words.size ? [...words] : [...DEFAULT_KILL_LIST];
+}
+
+/**
+ * Finds the active idiolect profile's ban-list.md inside a wiki: the profile
+ * named by the CLAUDE.md voice_profile key, or the only profile there is.
+ */
+export function findBanListPath(root: string): string | null {
+  const profilesDir = join(root, "profiles");
+  let name: string | undefined;
+  const claudeMd = join(root, "CLAUDE.md");
+  if (existsSync(claudeMd)) {
+    const m = readFileSync(claudeMd, "utf8").match(/\*\*voice_profile\*\*:\s*([\w][\w.-]*)/i);
+    if (m && m[1]!.toLowerCase() !== "none") name = m[1];
+  }
+  if (!name && existsSync(profilesDir)) {
+    const withBans = readdirSync(profilesDir).filter((d) =>
+      existsSync(join(profilesDir, d, "ban-list.md")));
+    if (withBans.length === 1) name = withBans[0];
+  }
+  const p = name ? join(profilesDir, name, "ban-list.md") : null;
+  return p && existsSync(p) ? p : null;
+}
+
 export interface KillHit extends Finding {
   word: string;
 }
@@ -330,14 +381,25 @@ if (import.meta.main) {
     process.exit(1);
   }
 
-  let voiceMd = "";
+  // The ban list comes from the active idiolect profile. --profile takes a
+  // profile directory or a ban-list.md; a legacy profile/voice.md kill list
+  // still parses; a wiki with neither gets the built-in defaults.
   let profilePath = profileArg;
+  if (profilePath && existsSync(profilePath) && statSync(profilePath).isDirectory()) {
+    profilePath = join(profilePath, "ban-list.md");
+  }
   if (!profilePath) {
     const root = findWikiRoot(process.cwd()) ?? findWikiRoot(files[0]!);
-    if (root && existsSync(join(root, "profile", "voice.md"))) profilePath = join(root, "profile", "voice.md");
+    if (root) {
+      profilePath = findBanListPath(root) ??
+        (existsSync(join(root, "profile", "voice.md")) ? join(root, "profile", "voice.md") : undefined);
+    }
   }
-  if (profilePath && existsSync(profilePath)) voiceMd = readFileSync(profilePath, "utf8");
-  const killList = parseKillList(voiceMd);
+  let killList = [...DEFAULT_KILL_LIST];
+  if (profilePath && existsSync(profilePath)) {
+    const md = readFileSync(profilePath, "utf8");
+    killList = basename(profilePath) === "ban-list.md" ? parseBanList(md) : parseKillList(md);
+  }
 
   const all: Finding[] = [];
   for (const file of files) {

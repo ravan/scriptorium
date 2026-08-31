@@ -1,6 +1,6 @@
 ---
 name: wiki
-description: Use when the user wants an agent-maintained knowledge wiki - creating one, ingesting source material (pptx, pdf, docx, markdown, images), asking questions of accumulated knowledge, recomposing it into blogs, LinkedIn posts, slide decks, docx or SVG images, health-checking pages, or building a personal voice/quality writing profile. Also use when a folder contains raw/.ingest-manifest.json or the user mentions "my wiki".
+description: Use when the user wants an agent-maintained knowledge wiki - creating one, ingesting source material (pptx, pdf, docx, markdown, images), asking questions of accumulated knowledge, recomposing it into blogs, LinkedIn posts, slide decks, docx or SVG images, health-checking pages, or building a personal voice profile (captured and maintained by the bundled idiolect skill). Also use when a folder contains raw/.ingest-manifest.json or the user mentions "my wiki".
 ---
 
 # Wiki
@@ -22,7 +22,7 @@ Talk in plain language. Run every command yourself; never ask the user to run on
 | "what do we know about...", any question against the wiki | Query | this file, Query section |
 | "write a blog/post/deck/doc/image from the wiki" | Compose | references/compose.md |
 | "health check", "lint", "anything stale?" | Lint | references/lint.md |
-| "capture my voice", missing profile/voice.md or quality doc | Profile | references/profile.md |
+| "capture my voice", "sounds fake", voice_profile is none | Profile | references/profile.md |
 
 Every wiki carries its own `CLAUDE.md` schema (created at setup). When working inside a wiki, that schema is the local authority; these references explain the machinery behind it.
 
@@ -46,7 +46,7 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 | Script | Job |
 |---|---|
 | `doctor.ts` | check required tools, print plain-language install hints |
-| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>] [--bundle-skills a,b]` | scaffold/repair a wiki, idempotent; refreshes `scripts/`, `templates/` and any bundled skills |
+| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>] [--bundle-skills a,b] [--voice-profile <name>]` | scaffold/repair a wiki, idempotent; refreshes `scripts/`, `templates/` and any bundled skills; always bundles (or installs) the `idiolect` skill, which owns the voice profiles in `profiles/` |
 | `ingest.ts [--dry-run] [--re-extract <file>]` | scan raw/, update manifest, extract text+media to derived/; junk images (blank/tiny/duplicate/unviewable) are gated into `skipped/` with a `skipped.json` note |
 | `manifest.ts status\|pending\|mark-ingested` | inspect and update ingest state |
 | `outline.ts [slug\|--all]` | heading map + `sed` read plan for extracted text too big to `cat` |
@@ -59,7 +59,7 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 | `compose-docx.ts <spec.json> -o out.docx` | back-compat shim over compose-doc.ts |
 | `verify-pptx.ts <deck.pptx> [spec.json]` | open the rendered deck and report what is really inside it: media per slide, notes, animation, and every image the spec asked for that did not arrive. Exit 2 on a problem |
 | `preview.ts <file> [-o dir] [--pages 1-4]` | turn a .pptx, .pdf, .svg or .gif into PNGs to read back as images. Decks go through LibreOffice or Keynote, the engines that will actually show them |
-| `voice-lint.ts <file.md \| spec.json>` | the mechanical half of `profile/voice.md`: connector dashes, sentences over one comma, kill-list words, emoji, long paragraphs. Reads the kill list from the wiki's own profile. Exit 2 on a hard-rule finding |
+| `voice-lint.ts <file.md \| spec.json>` | the mechanical half of the voice profile: connector dashes, sentences over one comma, banned words, emoji, long paragraphs. Reads the ban list from the active idiolect profile's `ban-list.md` (legacy `profile/voice.md` kill lists still parse). Exit 2 on a hard-rule finding |
 
 Spec JSON shapes are documented in the header comments of the two compose scripts.
 

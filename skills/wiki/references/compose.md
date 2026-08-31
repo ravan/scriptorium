@@ -4,10 +4,24 @@ Goal: recompose wiki knowledge into a new artifact - blog post, LinkedIn post, s
 
 ## Load order (before writing a word)
 
-1. `profile/voice.md` - governs every word of prose. Honor its HARD RULEs absolutely, STRONG TENDENCYs ~70-80% of the time, LIGHT PREFERENCEs by judgment (the profile explains its own labels).
-2. `profile/quality-and-style.md` - governs structure, checklists, antipatterns.
-3. For slides, docs, or images: the brand skill named in the wiki's `CLAUDE.md` (`brand_skill:`). If `none`, use the neutral defaults built into the compose scripts. Lolly renders carry the brand already; your own SVG and your edits to a render must match it.
-4. If a profile file is missing, offer the interview (references/profile.md) or proceed with a plain, neutral style after saying so.
+1. **The voice: an idiolect profile.** Read `voice_profile:` from the wiki's `CLAUDE.md` and load the bundled `idiolect` skill's `references/apply.md` (at `.claude/skills/idiolect/`). Apply the profile exactly as that file says: core `profiles/<name>/voice.md`, then the `registers/` overlay for this format (table below), then `quality.md`, then `ban-list.md`, then 1-3 matched exemplars if the profile links any. Idiolect's self-check order (substance, bans, register, mechanics, rhythm, attribution) is the final gate on every draft.
+2. For slides, docs, or images: the brand skill named in the wiki's `CLAUDE.md` (`brand_skill:`). If `none`, use the neutral defaults built into the compose scripts. Lolly renders carry the brand already; your own SVG and your edits to a render must match it.
+3. If `voice_profile:` is `none` or the profile is missing, offer to build one with idiolect (references/profile.md) or proceed with a plain, neutral style after saying so. A legacy `profile/voice.md` (pre-idiolect wiki) still governs until the user migrates - see references/profile.md.
+
+### Which register for which output
+
+Register names are folders the profile actually has - `ls profiles/<name>/registers/`. Match by this table, not by guess:
+
+| Wiki output | Register overlay |
+|---|---|
+| Blog post | `blog` |
+| LinkedIn post | `linkedin` |
+| Document from a `templates/docs/` template | the template's name (`whitepaper`, `pov`, `amazon-6pager`, ...) if that register exists; else `whitepaper`; else core |
+| Slide speaker `notes` | `talk` (it is spoken language, not prose) |
+| On-slide text (titles, bullets, captions) | core voice only - too short for a register to bite; the slide rules below govern shape |
+| Email or anything else | the register named like the format, if it exists |
+
+**Register missing?** Do what idiolect says: compose from the core, tell the user which overlay would have helped, and finish the piece. Then, once the user is happy with it, offer to create that register through idiolect's Refine mode with the approved piece as its first evidence - the gap should exist only once.
 
 ## Content rule
 
@@ -15,7 +29,7 @@ Draw facts from `wiki/` pages (find them with `bun scripts/wiki.ts find <terms>`
 
 ## Formats
 
-- **Blog / LinkedIn** - markdown straight into `outputs/`. Voice profile fully governs; quality doc supplies the structure and the final checklist.
+- **Blog / LinkedIn** - markdown straight into `outputs/`. The idiolect profile fully governs; its `quality.md` and the matching register overlay supply the structure and the final checklist.
 - **Slides** - see "Slides" below.
 - **Documents (whitepaper, PoV, 6-pager, ... as .md, .docx or .pdf)** - see "Documents" below.
 - **Images** - see "Visuals" below. SVGs referenced by slide/doc specs are converted to PNG automatically by the scripts.
@@ -112,9 +126,10 @@ bun scripts/verify-pptx.ts outputs/<name>.pptx outputs/<name>.spec.json   # the 
 bun scripts/preview.ts outputs/<name>.pptx -o /tmp/preview  # the slides
 ```
 
-- **`voice-lint.ts`** reads the kill list out of the wiki's own `profile/voice.md`
-  and checks what a regex can settle. It catches captions and bullets, which is
-  where a hand check misses things. Exit 2 means a hard rule was broken.
+- **`voice-lint.ts`** reads the banned words out of the active idiolect
+  profile's `ban-list.md` and checks what a regex can settle. It catches
+  captions and bullets, which is where a hand check misses things. Exit 2
+  means a hard rule was broken.
 - **`verify-pptx.ts`** opens the deck and reports media per slide, whether notes
   arrived, whether an animation kept its frames, and any image the spec asked for
   that is not there. It also warns when a visual fills far less of its slot than
@@ -148,7 +163,7 @@ Composing a document:
 
 ## Before calling it done
 
-1. Re-read the draft against the voice profile's Never list and the quality doc's checklist. Fix violations, then check again.
+1. Run idiolect's ordered self-check on the draft (substance, bans, register, mechanics, rhythm, attribution) against the loaded profile. Fix violations, then check again.
 2. Write the file into `outputs/` with a dated, descriptive name.
 3. Log entry (`bun scripts/wiki.ts log compose "<title>"`) + git commit.
 4. If composing produced genuinely new synthesis (a comparison, an argument, a connection not yet in the wiki), file it as a `wiki/syntheses/` page. Routine restatements do not get filed.

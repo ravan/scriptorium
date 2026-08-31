@@ -31,7 +31,7 @@ my-wiki/
   raw/                    # your sources; .ingest-manifest.json tracks state
   derived/                # machine-extracted text + images per source
   wiki/                   # index.md, log.md, sources/, topics/, entities/, syntheses/
-  profile/                # voice.md + quality-and-style.md (how outputs sound)
+  profiles/               # idiolect voice profiles, one folder per named voice
   outputs/                # composed blogs, posts, decks, docs, images
   templates/              # slide + document templates (skill-shipped and your own)
   scripts/                # self-contained copy of the bun helpers
@@ -81,16 +81,13 @@ Say *"ingest slowly"* if you want to review each source together before it is fi
 
 Decks are real `.pptx` files that import into Google Slides through File then Import. Documents render to `.md`, `.docx` or `.pdf` from one spec.
 
-## Your voice is two files, not a prompt you retype
+## Your voice is an idiolect profile, not a prompt you retype
 
-Composed outputs are governed by two files in `profile/`.
+Composed outputs are governed by a voice profile in `profiles/<name>/`, created and maintained by the [idiolect](https://github.com/ravan/slop) skill. Setup bundles idiolect into every wiki automatically (installing it from `ravan/hogwash` if it is not already on the machine), and the wiki's `CLAUDE.md` names the active profile.
 
-- **`voice.md`**: how you sound. Openings, sentence rhythm, a kill list of banned words, hard rules.
-- **`quality-and-style.md`**: what "good" means per format. Structure, evidence rules, ship checklists.
+A profile is a folder: `voice.md` (how you sound), `quality.md` (what "good" means per format), `ban-list.md` (words you forbid), `registers/` (per-format overlays: blog, LinkedIn, whitepaper, talk), plus an evidence ledger and a changelog. A wiki can hold several named voices.
 
-Have them already? The agent copies them in at setup. If you do not, say *"capture my voice"*.
-
-The agent then drafts a profile from three to five writing samples you paste, or runs a fifteen minute interview. Every interview question comes with three sample answers written in three different personas, so you can pick one or mix them or answer freely. Filled examples for a fictional writer live in `skills/wiki/examples/`.
+Say *"capture my voice"*. Idiolect builds the profile from writing you point it at, or through its guided interview when you have no samples, and it refines the profile every time you react to a piece ("I'd never say that"). `scripts/voice-lint.ts` enforces the ban list mechanically on every composed draft.
 
 ## Everything visual comes from a template folder you can edit
 
@@ -192,7 +189,7 @@ The spec JSON shapes are documented in the header comments of the compose script
 ## This repository
 
 ```
-skills/wiki/          # the skill: SKILL.md, references/, templates/, examples/, scripts/
+skills/wiki/          # the skill: SKILL.md, references/, templates/, scripts/
 skills/lolly/         # visual-asset skill used when composing
 skills/suse-brand/    # example brand skill
 .claude/skills/       # symlinks so this repo can run the skills directly

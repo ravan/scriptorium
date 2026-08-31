@@ -8,13 +8,18 @@
 // Fully offline. Every fixture is a string built in the test, so a failure
 // always means the linter changed and never that a file moved.
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   connectorDashes,
   emojiHits,
+  findBanListPath,
   killListHits,
   lintText,
   longParagraphs,
   overCommaed,
+  parseBanList,
   parseKillList,
   prosePolicyFor,
   splitSentences,
@@ -171,6 +176,82 @@ Plain mechanics words: actually, plumbing.
 
   test("returns the built-in list when the profile has no kill list", () => {
     expect(parseKillList("# Voice\n\nNothing here.").length).toBeGreaterThan(0);
+  });
+});
+
+describe("parseBanList", () => {
+  const bans = `
+# Ban list: Test Owner
+
+Bans do not touch quotes, code, commands, proper names.
+
+## Corporate filler
+
+- leverage — reads as a deck, not a person; say "use"
+- synergy — never
+- in today's fast-paced world — AI opener
+
+## AI tells
+
+- delve
+- <term> — unfilled placeholder from the template
+`;
+
+  test("reads one banned form per bullet", () => {
+    const list = parseBanList(bans);
+    expect(list).toContain("leverage");
+    expect(list).toContain("synergy");
+    expect(list).toContain("delve");
+  });
+
+  test("keeps multi-word phrases whole", () => {
+    expect(parseBanList(bans)).toContain("in today's fast-paced world");
+  });
+
+  test("drops the scope note after the spaced dash", () => {
+    expect(parseBanList(bans)).not.toContain('leverage — reads as a deck, not a person; say "use"');
+  });
+
+  test("skips unfilled template placeholders", () => {
+    expect(parseBanList(bans).some((w) => w.includes("<"))).toBe(false);
+  });
+
+  test("ignores prose outside bullets", () => {
+    expect(parseBanList(bans)).not.toContain("quotes");
+  });
+
+  test("falls back to the built-in list when nothing parses", () => {
+    expect(parseBanList("# Ban list\n\nNo bullets yet.").length).toBeGreaterThan(0);
+  });
+});
+
+describe("findBanListPath", () => {
+  function wiki(profiles: string[], claudeMd?: string): string {
+    const root = mkdtempSync(join(tmpdir(), "voice-lint-test-"));
+    for (const p of profiles) {
+      mkdirSync(join(root, "profiles", p), { recursive: true });
+      writeFileSync(join(root, "profiles", p, "ban-list.md"), "- leverage — no\n");
+    }
+    if (claudeMd) writeFileSync(join(root, "CLAUDE.md"), claudeMd);
+    return root;
+  }
+
+  test("follows the CLAUDE.md voice_profile key", () => {
+    const root = wiki(["ravan", "house"], "- **voice_profile**: house (active profile)\n");
+    expect(findBanListPath(root)).toBe(join(root, "profiles", "house", "ban-list.md"));
+  });
+
+  test("uses the only profile when CLAUDE.md names none", () => {
+    const root = wiki(["ravan"], "- **voice_profile**: none\n");
+    expect(findBanListPath(root)).toBe(join(root, "profiles", "ravan", "ban-list.md"));
+  });
+
+  test("returns null when several profiles exist and none is named", () => {
+    expect(findBanListPath(wiki(["a", "b"]))).toBeNull();
+  });
+
+  test("returns null when there are no profiles", () => {
+    expect(findBanListPath(wiki([]))).toBeNull();
   });
 });
 

@@ -12,13 +12,14 @@ function arg(flag: string): string | undefined {
 
 const target = process.argv[2];
 if (!target || target.startsWith("--")) {
-  console.error('Usage: bun setup.ts <wiki-folder> --name "My Wiki" [--brand <brand-skill-name>] [--slide-template <template-name>] [--bundle-skills lolly,suse-brand]');
+  console.error('Usage: bun setup.ts <wiki-folder> --name "My Wiki" [--brand <brand-skill-name>] [--slide-template <template-name>] [--bundle-skills lolly,suse-brand] [--voice-profile <name>]');
   process.exit(1);
 }
 
 const root = resolve(target);
 const name = arg("--name") ?? root.split("/").pop() ?? "wiki";
 const brand = arg("--brand") ?? "none";
+const voiceProfile = arg("--voice-profile") ?? "none";
 const slideTemplate = arg("--slide-template") ?? (brand.includes("suse") ? "suse-sovereign" : "neutral");
 const skillRoot = resolve(import.meta.dir, "..");
 // Sibling skills live beside this one, wherever the wiki skill itself is installed.
@@ -54,7 +55,7 @@ for (const d of [
   "wiki/topics",
   "wiki/entities",
   "wiki/syntheses",
-  "profile",
+  "profiles",
   "outputs",
   "scripts",
 ]) {
@@ -80,7 +81,8 @@ if (existsSync(templatePath)) {
     .replaceAll("{{WIKI_NAME}}", name)
     .replaceAll("{{DATE}}", today)
     .replaceAll("{{BRAND_SKILL}}", brand)
-    .replaceAll("{{SLIDE_TEMPLATE}}", slideTemplate);
+    .replaceAll("{{SLIDE_TEMPLATE}}", slideTemplate)
+    .replaceAll("{{VOICE_PROFILE}}", voiceProfile);
   ensureFile("CLAUDE.md", t);
 } else if (!existsSync(join(root, "CLAUDE.md"))) {
   console.warn("warning: template wiki-claude.md not found next to this script; CLAUDE.md not created.");
@@ -156,6 +158,38 @@ for (const s of bundleSkills) {
   made.push(`.claude/skills/${s}/` + (fresh ? "" : " (refreshed)"));
 }
 
+// 5d. Idiolect is not optional: it owns the voice profiles under profiles/,
+// so every wiki bundles it. Prefer a locally installed copy (kept fresh like
+// the other bundles); fall back to installing it from ravan/hogwash with the
+// skills CLI. A wiki without idiolect composes in a neutral voice only.
+{
+  const dst = join(root, ".claude", "skills", "idiolect");
+  const candidates = [
+    join(skillsRoot, "idiolect"),
+    join(process.env.HOME ?? "", ".claude", "skills", "idiolect"),
+  ];
+  const src = candidates.find((c) => existsSync(join(c, "SKILL.md")));
+  if (src) {
+    const fresh = !existsSync(dst);
+    cpSync(src, dst, {
+      recursive: true,
+      filter: (from) => !/(^|\/)(node_modules|\.cache|\.git)(\/|$)/.test(from),
+    });
+    made.push(".claude/skills/idiolect/" + (fresh ? "" : " (refreshed)"));
+  } else if (!existsSync(join(dst, "SKILL.md"))) {
+    console.log("Installing the idiolect skill (voice profiles) from ravan/hogwash...");
+    run(["npx", "-y", "skills", "add", "ravan/hogwash", "--skill", "idiolect"], root);
+    if (existsSync(join(dst, "SKILL.md"))) {
+      made.push(".claude/skills/idiolect/");
+    } else {
+      console.warn(
+        "warning: could not install the idiolect skill. Voice profiles need it.\n" +
+          "  Install it later from the wiki folder with: npx skills add ravan/hogwash --skill idiolect",
+      );
+    }
+  }
+}
+
 // The ignore list grows as the wiki gains parts, so append what is missing
 // rather than skipping an existing file: an older wiki would otherwise commit a
 // bundled skill's node_modules the first time it bundles one.
@@ -204,4 +238,4 @@ if (have("git")) {
 
 console.log(`Wiki "${name}" is ready at ${root}`);
 console.log(made.length ? "Created:\n  " + made.join("\n  ") : "Nothing to create; everything was already there.");
-console.log("\nNext steps:\n  1. Put source files into raw/ (subfolders are fine).\n  2. Run: bun scripts/ingest.ts\n  3. Add voice.md and quality-and-style.md to profile/ (the skill can interview you).");
+console.log("\nNext steps:\n  1. Put source files into raw/ (subfolders are fine).\n  2. Run: bun scripts/ingest.ts\n  3. Say \"capture my voice\" - the bundled idiolect skill builds a voice profile in profiles/.");

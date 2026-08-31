@@ -9,9 +9,9 @@ The agent maintains it; the human curates sources and asks questions.
 - **visuals**: the `lolly` skill when present - a hosted, template-driven generator for charts, codes, gradients, cards, badges and lockups. Renders are on-brand and reproducible from their inputs, so they beat hand-drawn SVG for any shape a tool covers; hand-drawn SVG is for bespoke structure only
 - **slide_template**: {{SLIDE_TEMPLATE}} (folder under `templates/slides/`; every composed deck uses it via the spec's `"template"` key. List choices with `ls templates/slides/`; the user can add their own or ask for a new one)
 - **doc templates**: folders under `templates/docs/` (whitepaper, pov, amazon-6pager, ...). Each is a document type: `template.json` styles and lints it, `structure.md` is its required skeleton. Chosen per request, not globally; renders to .md, .docx or .pdf via `compose-doc.ts`
-- **voice**: `profile/voice.md` (governs the words of every composed output; if missing, offer the profile interview)
-- **quality**: `profile/quality-and-style.md` (governs structure and QA checks of composed outputs)
-- **bundled skills**: `ls .claude/skills/` - the skills this wiki carries with it, so a session started in this folder can load them by name with no global install. If a skill named above is missing there, re-run setup with `--bundle-skills <name>` rather than working around its absence.
+- **voice_profile**: {{VOICE_PROFILE}} (the active idiolect voice profile: a folder under `profiles/`. "none" = no profile yet; offer to build one, or compose in a plain neutral style after saying so)
+- **voice engine**: the bundled `idiolect` skill (`.claude/skills/idiolect/`). It creates and maintains every profile in `profiles/<name>/` (voice.md core, registers/ overlays, quality.md bar, ban-list.md bans, evidence.md, changelog.md). Before composing, load its `references/apply.md` and follow it. To create, critique or refine a profile, run idiolect's own modes; never edit a profile outside its feedback loop. If the skill folder is missing, re-run `bun scripts/setup.ts .`
+- **bundled skills**: `ls .claude/skills/` - the skills this wiki carries with it, so a session started in this folder can load them by name with no global install. If a skill named above is missing there, re-run setup with `--bundle-skills <name>` rather than working around its absence (`idiolect` is bundled by setup automatically, no flag needed).
 
 ## The three layers
 
@@ -19,7 +19,7 @@ The agent maintains it; the human curates sources and asks questions.
 2. **`wiki/`** - agent-owned markdown. The human reads it; the agent writes it.
 3. **This file** - the schema. Keep it current when conventions evolve.
 
-Supporting folders: `derived/` (machine-extracted text/images per source, written by `scripts/ingest.ts`), `profile/` (voice + quality), `outputs/` (composed artifacts), `scripts/` (bun helpers), `templates/slides/` (pptx slide templates; skill-owned ones are refreshed by setup, user-added ones are kept).
+Supporting folders: `derived/` (machine-extracted text/images per source, written by `scripts/ingest.ts`), `profiles/` (idiolect voice profiles, one folder per named voice), `outputs/` (composed artifacts), `scripts/` (bun helpers), `templates/slides/` (pptx slide templates; skill-owned ones are refreshed by setup, user-added ones are kept).
 
 ## Wiki page types
 
@@ -54,11 +54,11 @@ Conventions: standard markdown links with relative paths (never `[[wikilinks]]`)
 Start with `bun scripts/wiki.ts find <terms>` (fall back to `find --text`), then `bun scripts/wiki.ts page <slug>` to see a hit's neighbours, then read the actual pages that matter. Never read `index.json` or `map.json` whole - they grow with the wiki; the queries stay small. Answer with links to wiki pages and raw sources. If the answer produced genuinely new synthesis, file it under `wiki/syntheses/` and log it (`wiki.ts log query "<question>"`).
 
 ### Compose (blog, LinkedIn post, slides, docx, images)
-1. Load `profile/voice.md` + `profile/quality-and-style.md`; for slides/docs/images also load the brand skill named above.
+1. Load the active idiolect profile (`profiles/<voice_profile>/`) through the idiolect skill's `references/apply.md`: core voice.md, the register overlay for this format, quality.md, ban-list.md. Register map (use a folder that exists in `profiles/<voice_profile>/registers/`): blog → `blog`, LinkedIn → `linkedin`, doc template → its own name else `whitepaper`, speaker notes → `talk`, on-slide text → core only. No matching register: compose from the core, say which overlay would have helped, and after the piece is approved offer to create that register via idiolect Refine. For slides/docs/images also load the brand skill named above.
 2. Gather content from wiki pages (never invent facts not in the wiki or raw sources).
 3. Blog/LinkedIn: write markdown into `outputs/`. Slides: follow the skill's `references/compose.md` slide rules (assertion titles, one idea per slide, visuals over bullets), write a spec JSON with `"template"` set to the configured slide_template, then `bun scripts/compose-pptx.ts <spec> -o outputs/<name>.pptx` and fix every `lint:` warning it prints. Documents (whitepaper, PoV, 6-pager as .md/.docx/.pdf): pick a `templates/docs/` template with the user, follow its `structure.md`, write a spec JSON, then `bun scripts/compose-doc.ts <spec> -o outputs/<name>.<ext>` and fix every `lint:` line.
 4. **Visuals: you decide, per visual.** If the `lolly` skill is available, ask it first (`bun <skills>/lolly/scripts/lolly.ts catalog --image <keyword>`) - charts, QR codes, gradients, quote cards, badges, lockups and framed screenshots come from a Lolly tool, on-brand and reproducible, and never get hand-drawn. Render with `--format=svg`, set the tool's presentation inputs (a default render is correct but ugly), and annotate the returned SVG yourself where the figure needs to say more. Hand-write brand-true SVG only for bespoke structure no tool covers. Full rules: the skill's `references/compose.md`, "Visuals".
-5. Run the voice and quality checks against the draft before calling it done.
+5. Before calling it done: `bun scripts/voice-lint.ts <draft>` (bans and mechanics), then idiolect's ordered self-check (substance, bans, register, mechanics, rhythm, attribution).
 6. Log entry (`wiki.ts log compose "<title>"`) + git commit. File new insights back into `wiki/syntheses/`.
 
 ### Lint

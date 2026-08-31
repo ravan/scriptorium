@@ -1,47 +1,61 @@
-# Profile mode - capturing voice and quality
+# Profile mode - voice profiles via idiolect
 
-Goal: `profile/voice.md` (how the user sounds) and `profile/quality-and-style.md` (what "good" means per format). Templates: `templates/voice-template.md`, `templates/quality-template.md`. Filled examples for calibration: `examples/voice-example.md`, `examples/quality-example.md` (a fictional persona - never present it as the user's).
+The wiki does not capture voice itself. The `idiolect` skill does: it builds a
+versioned voice profile from the owner's real writing or a guided interview,
+and it maintains that profile through feedback. This file is only the glue
+between the wiki and idiolect.
 
-## Fast path: writing samples first
+## Where profiles live
 
-Before interviewing, ask: "Do you have 3-5 things you wrote yourself - posts, emails, a blog? Paste them or point me to the files." Real text beats self-description. Draft the voice profile from the samples, then run only the interview questions the samples cannot answer (beliefs, hard NOs, kill list), and confirm the draft section by section.
+Idiolect profiles live at the wiki root, one directory per named voice:
 
-## Interview (no samples, or to fill gaps)
+```
+profiles/<name>/
+  voice.md          # stable core: portrait, dimensions, mechanics, lexicon
+  quality.md        # what "good" means per format
+  ban-list.md       # owner-declared banned words (machine-scannable bullets)
+  registers/*.md    # per-context overlays: blog, linkedin, whitepaper, talk...
+  evidence.md       # sample ledger, observations, interview record
+  changelog.md      # dated history of every durable change
+```
 
-Rules of the room: one question at a time, plain language, ~15 minutes total. **Every question comes with 3 sample answers in 3 distinct personas**, so the user can pick one, mix them, or answer freely. Keep the personas consistent all the way through:
+The active profile is named by the `voice_profile:` key in the wiki's
+`CLAUDE.md`. `none` means no profile yet; composing then uses a plain neutral
+style and `scripts/voice-lint.ts` falls back to its built-in kill list.
 
-- **A - the warm teacher**: explains at the kitchen table, personal stories, plain words.
-- **B - the sharp analyst**: leads with the claim, evidence-first, no decoration.
-- **C - the playful storyteller**: openings with a scene, humor, vivid detail.
+## Running a profile build or change
 
-Example of the format:
+1. **Load the bundled idiolect skill**: `.claude/skills/idiolect/SKILL.md`.
+   If it is missing, re-run `bun scripts/setup.ts .` - setup bundles or
+   installs idiolect automatically.
+2. **Follow idiolect's own onboarding and modes** (Create, Apply, Critique,
+   Refine). Idiolect owns the method: corpus rules, the interview, the rubric,
+   the feedback loop. Do not improvise a parallel interview here.
+3. **Point idiolect at `profiles/`** as the profiles directory.
+4. **Honor idiolect's sample boundary inside the wiki.** `raw/` and `wiki/`
+   are full of other people's writing and agent-written pages. Never treat
+   them as voice samples. Use only files the owner explicitly names as their
+   own authentic writing.
+5. **Registers worth offering first**: the formats this wiki composes, named
+   exactly as compose mode looks them up - `blog`, `linkedin`, `whitepaper`,
+   `talk` (slide speaker notes). A doc template can get a register of its own
+   name (`pov`, `amazon-6pager`) when the general `whitepaper` overlay is not
+   enough. Only deltas from the core. The full lookup table is in
+   references/compose.md.
 
-> **How do you want a piece to open?**
-> A: "With a real moment. 'Last week a customer asked me...' - then the lesson."
-> B: "With the conclusion. State the point in sentence one, then prove it."
-> C: "With a scene. Drop the reader somewhere concrete, make them curious."
-> Pick one, mix them, or say it your own way.
+## After any profile change
 
-The 14 questions (each maps to a template section):
+1. If a new profile was created or the active one renamed, set
+   `voice_profile:` in the wiki's `CLAUDE.md` to its name.
+2. Log it: `bun scripts/wiki.ts log profile "<what changed>"`.
+3. Git commit. Idiolect's own changelog entry (in the profile) plus the wiki
+   log entry together are the audit trail.
 
-1. Who are you writing for, and what should they feel after reading? (Core identity)
-2. What do you believe about your field that most peers would push back on? (Beliefs)
-3. Pick a hill you would die on publicly. How do you deliver a strong position? (Beliefs)
-4. How do you want a piece to open? (Mechanics)
-5. How do you close - question, summary, call to action? (Mechanics)
-6. Short punchy sentences, longer flowing ones, or a mix? Paragraph size? (Mechanics)
-7. Which words or phrases make you cringe and must never appear? (Kill list)
-8. Which words feel like home - the ones you actually say? (Loved words)
-9. Formatting: bold? italics? emojis? headers? lists? (Mechanics)
-10. What instantly makes you distrust a piece of writing by someone else? (Aesthetic crimes)
-11. Humor: none, dry, wordplay, self-deprecating? How often? (Personality)
-12. Do you tell stories or personal examples? Named or anonymized? (Personality)
-13. Topics or styles that are absolute no-go areas? (Hard NOs)
-14. If an AI wrote as you, what is the one instruction you would give it? (Calibration)
+## Legacy wikis
 
-## Writing the files
-
-1. Fill `templates/voice-template.md`. Label every rule **HARD RULE** (never break), **STRONG TENDENCY** (~70-80% of the time) or **LIGHT PREFERENCE** (judgment), and keep the anti-overfitting section - it prevents caricature.
-2. For quality: ask which formats matter (blog, LinkedIn, whitepaper, slides), then propose rules per format from `templates/quality-template.md` for the user to approve or edit - this doc is more proposal-driven than the voice interview.
-3. Read the draft back in one short sample paragraph written in the captured voice: "Does this sound like you?" Iterate until yes.
-4. Save to `profile/`, log entry, git commit. Remind the user they can deepen any section later.
+Older wikis carry `profile/voice.md` and `profile/quality-and-style.md` from
+the retired template mechanism. Do not delete them silently. Offer to migrate:
+idiolect treats them as one existing owner-approved profile, rebuilds it as
+`profiles/<name>/` through its Create/Critique flow, and the old `profile/`
+folder is removed in the same commit once the owner approves the new one.
+Until migration, `voice-lint.ts` still reads the old kill list.
