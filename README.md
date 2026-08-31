@@ -83,7 +83,7 @@ Decks are real `.pptx` files that import into Google Slides through File then Im
 
 ## Your voice is an idiolect profile, not a prompt you retype
 
-Composed outputs are governed by a voice profile in `profiles/<name>/`, created and maintained by the [idiolect](https://github.com/ravan/slop) skill. Setup bundles idiolect into every wiki automatically (installing it from `ravan/hogwash` if it is not already on the machine), and the wiki's `CLAUDE.md` names the active profile.
+Composed outputs are governed by a voice profile in `profiles/<name>/`, created and maintained by the [idiolect](https://github.com/ravan/hogwash/tree/main/skills/idiolect) skill. Setup bundles idiolect into every wiki automatically (installing it from `ravan/hogwash` if it is not already on the machine), and the wiki's `CLAUDE.md` names the active profile.
 
 A profile is a folder: `voice.md` (how you sound), `quality.md` (what "good" means per format), `ban-list.md` (words you forbid), `registers/` (per-format overlays: blog, LinkedIn, whitepaper, talk), plus an evidence ledger and a changelog. A wiki can hold several named voices.
 
