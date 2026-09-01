@@ -7,3 +7,10 @@ baton.json
 /testing
 node_modules/
 /refs
+
+# Local development symlinks to the ravan/hogwash repo (idiolect + hogwash).
+# The published install is `npx skills add ravan/hogwash --skill <name>`; these
+# links only exist on a machine that is editing those skills, and they point
+# outside this repo, so committing them would dangle for everyone else.
+/skills/idiolect
+/skills/hogwash
