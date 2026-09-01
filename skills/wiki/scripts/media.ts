@@ -14,13 +14,14 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { loadManifest, slugFor, wikiRootOrDie } from "./common";
-import { type ImageInfo, type SkippedEntry, inspectImage, junkReason } from "./image";
+import { type ImageInfo, type SkippedEntry, inspectImage, junkReason, pageIsTextOnly } from "./image";
 
 interface Info extends ImageInfo {
   abs: string;
   rel: string;
   source: string;
   skip?: string; // junk reason, when the file predates the extraction gate
+  textPage?: boolean; // a pages/ render that is only typeset text
 }
 
 // ---- gather ------------------------------------------------------------------
@@ -85,8 +86,15 @@ for (const { source, dir } of dirs) {
     if (!statSync(abs).isFile()) continue;
     const info = await inspectImage(abs);
     const junk = junkReason(info, noSeen); // catches blank/tiny/unviewable on pre-gate folders
+    // Only `pages/` renders are eligible: an embedded media/ image is a figure by
+    // construction, and running it through a text-page test could only lose one.
+    let textPage = false;
+    if (!junk && source.endsWith("· pages") && info.format === "png") {
+      textPage = pageIsTextOnly(Buffer.from(await Bun.file(abs).arrayBuffer()));
+    }
     all.push({
       ...info,
+      textPage,
       abs,
       rel: relative(root, abs),
       source,
@@ -109,13 +117,15 @@ const dupGroups = [...byHash.values()].filter((g) => g.length > 1);
 const dupFollowers = new Set(dupGroups.flatMap((g) => g.slice(1).map((i) => i.abs)));
 
 const junked = all.filter((i) => i.skip);
-const toView = all.filter((i) => !i.skip && !dupFollowers.has(i.abs));
+const textPages = all.filter((i) => !i.skip && i.textPage);
+const toView = all.filter((i) => !i.skip && !i.textPage && !dupFollowers.has(i.abs));
 const preGated = skippedJsons.reduce((n, s) => n + s.entries.length, 0);
 
 // ---- report ------------------------------------------------------------------
 
 const parts = [`${toView.length} to view`];
 if (dupFollowers.size) parts.push(`${dupFollowers.size} duplicate`);
+if (textPages.length) parts.push(`${textPages.length} text-only page render`);
 if (junked.length) parts.push(`${junked.length} junk (pre-gate folder)`);
 if (preGated) parts.push(`${preGated} already filtered at extraction`);
 console.log(`${all.length} image(s) across ${dirs.length} folder(s): ${parts.join(", ")}.`);
@@ -174,6 +184,17 @@ if (preGated) {
     const sum = [...byReason.entries()].map(([r, n]) => `${n} ${r}`).join(", ");
     console.log(`  ${s.source}: ${s.entries.length} (${sum})`);
   }
+}
+
+if (textPages.length) {
+  const bySource = new Map<string, number>();
+  for (const i of textPages) bySource.set(i.source, (bySource.get(i.source) ?? 0) + 1);
+  console.log(
+    `\nText-only page renders (pictures of text already in text.*). Not worth viewing;` +
+      ` account for them in one line on the source page:`,
+  );
+  for (const [src, n] of bySource) console.log(`  ${src}: ${n}`);
+  console.log(`  Need one anyway? Read the file directly, e.g. when the text extraction looks garbled.`);
 }
 
 console.log(

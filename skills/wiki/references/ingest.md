@@ -18,9 +18,13 @@ Two speeds. **Batch** (default): process everything pending, log each. **Slow** 
    bun scripts/outline.ts     # structure + read plan for every pending text
    bun scripts/media.ts       # every pending image, with paths to view
    ```
-   `outline.ts` prints a heading map and a ready-to-paste `sed -n 'a,bp'` slice per section. Extracted text runs to 40 KB and more; `cat` on a file that size truncates and you lose the tail without being told. Read the slices instead.
+   `outline.ts` prints a heading map and a ready-to-paste `sed -n 'a,bp'` slice per section, every slice sized to arrive whole. Extracted text runs to 40 KB and more; `cat` on a file that size truncates and you lose the tail without being told. Read the slices instead.
+
+   **The read plan is a map, not a route.** For a long structured source (legislation, a standard, a spec) the recipe is: read the heading map first, decide which sections carry the answer, then read only those slices. A 129-page regulation prints 43 slices and perhaps six of them matter. Where the headings are too generic to choose from, `grep -n` for the document's own spine (`^Article `, `^Section `, `^[0-9]+\.`) gives a sharper index than the outline can infer. Reading a 5,000-line source end to end is a choice, and usually the wrong one.
 
    `media.ts` prints absolute image paths (paste straight into a file read) for images **worth viewing only** - the extraction gate already filtered junk, and anything junk-like that survives in an older derived/ folder is reported as counts and relative paths, never as a viewable path. Cross-source byte-identical files are grouped: view the first, reuse its description. A "possible near-duplicates" hint (same format and pixel size) is only a hint; check while viewing.
+
+   PDF `pages/` renders that hold nothing but typeset text are summarised as a count too, since their content is already in `text.*`. A page carrying a figure still gets listed, including a pale grey one: the test looks for colour, filled panels and solid blocks, and resolves every uncertain case to "show it". If an extraction looks garbled, read the page render directly by path rather than trusting the count.
 
 3. For each file listed by `bun scripts/manifest.ts pending` (not only what the latest run printed - an interrupted ingest leaves earlier files pending too), build understanding:
    - Read the derived text (or raw file), in the slices `outline.ts` gave you.

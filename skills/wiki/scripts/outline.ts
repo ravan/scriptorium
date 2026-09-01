@@ -23,7 +23,7 @@ interface Heading {
 }
 
 /** Markdown ATX headings, plus the numbered-section headings that PDF text extraction leaves behind. */
-function findHeadings(lines: string[]): Heading[] {
+export function findHeadings(lines: string[]): Heading[] {
   const out: Heading[] = [];
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i]!;
@@ -49,21 +49,122 @@ function findHeadings(lines: string[]): Heading[] {
   return out;
 }
 
-/** Even slices, used when a file has no usable headings. */
+/**
+ * UTF-8 **byte** cost of lines [from..to], 1-indexed inclusive, counting newlines.
+ *
+ * Bytes, not `String.length`: the tool output limit is measured in bytes, and
+ * extracted legislation is full of curly quotes and en dashes that cost 3 bytes
+ * each but count as 1 JS char. Budgeting in chars overshot by up to 1.2% on real
+ * EU texts, which is exactly the margin that turns a clean read into a spill.
+ */
+export function sliceChars(lines: string[], from: number, to: number): number {
+  let n = 0;
+  for (let i = from - 1; i < to && i < lines.length; i++) {
+    n += Buffer.byteLength(lines[i]!, "utf8") + 1;
+  }
+  return n;
+}
+
+/** UTF-8 byte cost of one line plus its newline. */
+function lineBytes(line: string): number {
+  return Buffer.byteLength(line, "utf8") + 1;
+}
+
+/**
+ * Even slices, used when a file has no usable headings and to subdivide an
+ * oversized span. Cuts *before* the line that would breach the budget, so a
+ * chunk never exceeds it. A single line longer than the budget cannot be split,
+ * so it becomes its own chunk rather than being dropped.
+ */
 function evenChunks(lines: string[], chars: number): Array<[number, number]> {
   const chunks: Array<[number, number]> = [];
   let start = 1;
   let budget = 0;
   for (let i = 0; i < lines.length; i++) {
-    budget += lines[i]!.length + 1;
-    if (budget >= chars) {
-      chunks.push([start, i + 1]);
-      start = i + 2;
+    const cost = lineBytes(lines[i]!);
+    if (budget && budget + cost > chars) {
+      chunks.push([start, i]); // close before this line
+      start = i + 1;
       budget = 0;
     }
+    budget += cost;
   }
   if (start <= lines.length) chunks.push([start, lines.length]);
   return chunks;
+}
+
+export interface Slice {
+  from: number; // 1-indexed inclusive
+  to: number; // 1-indexed inclusive
+  label: string;
+}
+
+/**
+ * Build a read plan where **every slice fits the budget**.
+ *
+ * Headings are cut points, not the only cut points. That distinction is the whole
+ * fix: real extracted legislation puts ~1,800 lines of recitals before the first
+ * "CHAPTER I", and grouping only *at* headings emitted that run as one 150 KB
+ * slice. The agent then pays for a truncated read and may lose the tail silently.
+ *
+ * So: split into heading-delimited spans, pack small spans together, and subdivide
+ * any span that is over budget on its own. A subdivided span keeps its heading in
+ * the label with a "part n/m" suffix, so the agent always knows it is mid-section.
+ */
+export function planSlices(lines: string[], chars: number): Slice[] {
+  if (!lines.length) return [];
+
+  const headings = findHeadings(lines);
+  const boundaries = [1, ...headings.map((h) => h.line).filter((l) => l > 1), lines.length + 1];
+  const uniq = [...new Set(boundaries)].sort((a, b) => a - b);
+
+  // Span = the text from one boundary up to (not including) the next.
+  const spans: Slice[] = [];
+  for (let i = 0; i < uniq.length - 1; i++) {
+    const from = uniq[i]!;
+    const to = uniq[i + 1]! - 1;
+    if (to < from) continue;
+    const h = headings.find((x) => x.line === from);
+    spans.push({ from, to, label: h ? h.text : "(front matter)" });
+  }
+  if (!spans.length) spans.push({ from: 1, to: lines.length, label: "(whole file)" });
+
+  const out: Slice[] = [];
+  let pending: Slice | null = null;
+
+  const flush = () => {
+    if (pending) out.push(pending);
+    pending = null;
+  };
+
+  for (const span of spans) {
+    const cost = sliceChars(lines, span.from, span.to);
+
+    if (cost > chars) {
+      // Over budget on its own: emit what is pending, then subdivide this span.
+      flush();
+      const sub = evenChunks(lines.slice(span.from - 1, span.to), chars);
+      const total = sub.length;
+      sub.forEach(([a, b], idx) => {
+        out.push({
+          from: span.from + a - 1,
+          to: span.from + b - 1,
+          label: total > 1 ? `${span.label} (part ${idx + 1}/${total})` : span.label,
+        });
+      });
+      continue;
+    }
+
+    if (pending && sliceChars(lines, pending.from, span.to) <= chars) {
+      pending = { from: pending.from, to: span.to, label: pending.label };
+    } else {
+      flush();
+      pending = { ...span };
+    }
+  }
+  flush();
+
+  return out;
 }
 
 function report(root: string, absPath: string): void {
@@ -86,32 +187,9 @@ function report(root: string, absPath: string): void {
 
   console.log(`  Too big to cat. Read it in the slices below.`);
 
-  // Group headings into slices that each stay under the safe size.
-  const cuts: Array<{ from: number; to: number; label: string }> = [];
-  if (headings.length >= 2) {
-    let from = 1;
-    let label = "(front matter)";
-    let budget = 0;
-    for (const h of headings) {
-      const spanChars = lines.slice(from - 1, h.line - 1).reduce((n, l) => n + l.length + 1, 0);
-      if (budget + spanChars > SAFE_CHARS && h.line > from) {
-        cuts.push({ from, to: h.line - 1, label });
-        from = h.line;
-        label = h.text;
-        budget = 0;
-      } else {
-        budget += spanChars;
-        if (label === "(front matter)" && cuts.length === 0 && from === 1) label = h.text;
-      }
-    }
-    cuts.push({ from, to: lines.length, label });
-  } else {
-    for (const [from, to] of evenChunks(lines, SAFE_CHARS)) {
-      cuts.push({ from, to, label: `lines ${from}-${to}` });
-    }
-  }
+  const cuts = planSlices(lines, SAFE_CHARS);
 
-  console.log(`\n  Read plan (${cuts.length} slices):`);
+  console.log(`\n  Read plan (${cuts.length} slices, each under ${SAFE_CHARS.toLocaleString()} chars):`);
   const cmds = cuts.map((c) => `sed -n '${c.from},${c.to}p' ${rel}`);
   const width = Math.max(...cmds.map((c) => c.length));
   for (let i = 0; i < cuts.length; i++) {
@@ -127,7 +205,8 @@ function report(root: string, absPath: string): void {
 }
 
 // ---- resolve what to inspect -------------------------------------------------
-
+// Guarded so `import { planSlices } from "./outline"` in tests does not run the CLI.
+if (import.meta.main) {
 const args = process.argv.slice(2).filter((a) => a !== "--all");
 const wantAll = process.argv.includes("--all");
 const root = wikiRootOrDie();
@@ -173,3 +252,4 @@ if (!targets.length) {
 console.log(`Outlining ${targets.length} file(s). Slice budget: ${SAFE_CHARS.toLocaleString()} chars.`);
 for (const t of targets) report(root, t);
 console.log("");
+}

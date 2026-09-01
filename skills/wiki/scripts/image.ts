@@ -9,6 +9,11 @@
 // Near-duplicates (same picture, different encoding) are NEVER auto-skipped;
 // media.ts only hints at them. Wrongly skipping a real diagram costs more than
 // one wasted view.
+//
+// Separately, pageIsTextOnly() recognises a PDF `pages/` render that is only
+// typeset text. Those are not junk and are not moved: the file stays put and
+// media.ts merely reports it as a count, because its content already sits in
+// text.*. Same bias as above - uncertainty means "show it".
 import { existsSync, mkdirSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inflateSync } from "node:zlib";
@@ -229,6 +234,216 @@ export function pngIsBlank(buf: Buffer, hdr: { w: number; h: number; depth: numb
   }
 
   return first !== null;
+}
+
+/**
+ * Decode a non-interlaced 8-bit PNG into RGB rows composited over white.
+ * Returns null for anything unsupported, so callers fail safe.
+ */
+function decodePngRgbRows(buf: Buffer, hdr: { w: number; h: number; depth: number; colour: number }): Buffer[] | null {
+  if (hdr.depth !== 8 || hdr.colour === 3) return null; // palette colour lives in PLTE
+  const channels = { 0: 1, 2: 3, 4: 2, 6: 4 }[hdr.colour];
+  if (!channels || !hdr.w || !hdr.h) return null;
+  if (buf[28] !== 0) return null; // interlaced
+
+  const idat: Buffer[] = [];
+  let off = 8;
+  while (off + 8 <= buf.length) {
+    const len = buf.readUInt32BE(off);
+    const type = buf.toString("ascii", off + 4, off + 8);
+    if (type === "IDAT") idat.push(buf.subarray(off + 8, off + 8 + len));
+    if (type === "IEND") break;
+    off += 12 + len;
+  }
+  if (!idat.length) return null;
+
+  let raw: Buffer;
+  try {
+    raw = inflateSync(Buffer.concat(idat));
+  } catch {
+    return null;
+  }
+
+  const bpp = channels;
+  const stride = hdr.w * bpp;
+  if (raw.length < (stride + 1) * hdr.h) return null;
+
+  const hasAlpha = hdr.colour === 4 || hdr.colour === 6;
+  const colourCh = hasAlpha ? bpp - 1 : bpp;
+  const prev = Buffer.alloc(stride);
+  const cur = Buffer.alloc(stride);
+  const rows: Buffer[] = [];
+
+  for (let y = 0; y < hdr.h; y++) {
+    const base = y * (stride + 1);
+    const filter = raw[base]!;
+    raw.copy(cur, 0, base + 1, base + 1 + stride);
+
+    for (let x = 0; x < stride; x++) {
+      const a = x >= bpp ? cur[x - bpp]! : 0;
+      const b = prev[x]!;
+      const c = x >= bpp ? prev[x - bpp]! : 0;
+      let v = cur[x]!;
+      switch (filter) {
+        case 0: break;
+        case 1: v = (v + a) & 0xff; break;
+        case 2: v = (v + b) & 0xff; break;
+        case 3: v = (v + ((a + b) >> 1)) & 0xff; break;
+        case 4: {
+          const p = a + b - c;
+          const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+          v = (v + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 0xff;
+          break;
+        }
+        default: return null;
+      }
+      cur[x] = v;
+    }
+    cur.copy(prev);
+
+    const row = Buffer.alloc(hdr.w * 3);
+    for (let px = 0; px < hdr.w; px++) {
+      const o = px * bpp;
+      const alpha = hasAlpha ? cur[o + colourCh]! : 255;
+      for (let ch = 0; ch < 3; ch++) {
+        const src = cur[o + Math.min(ch, colourCh - 1)]!;
+        row[px * 3 + ch] = Math.round((src * alpha + 255 * (255 - alpha)) / 255);
+      }
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+const INK_LEVEL = 160; // grey darker than this counts as ink
+const SATURATION_LEVEL = 40; // max(RGB)-min(RGB) above this counts as colour
+// Anything not essentially paper-white. Pale grey figure panels are invisible to
+// an ink threshold, so they are caught by their tint instead: a real diagram was
+// hidden in testing because its fills were lighter than INK_LEVEL.
+const TINT_LEVEL = 248;
+
+/**
+ * Is this page render nothing but typeset text?
+ *
+ * Ingesting six EU regulations produced 326 `pages/` renders, every one a picture
+ * of paragraphs already sitting in text.txt. Viewing them adds nothing and costs
+ * an agent view each, so they should be surveyed as a count, not as a worklist.
+ *
+ * Detection is a projection profile: typeset text makes regular horizontal bands
+ * of ink separated by whitespace, at a steady line pitch, with low overall
+ * coverage and no colour. A figure breaks at least one of those.
+ *
+ * **Biased hard towards `false`.** Hiding a page that holds a diagram loses
+ * knowledge permanently, while showing a text page costs one view. Anything
+ * unsupported, uncertain or unusual therefore returns false.
+ *
+ * Intended for `pages/` renders only. Embedded `media/` images are figures by
+ * construction and must never be run through this.
+ */
+export function pageIsTextOnly(buf: Buffer): boolean {
+  return pageProfile(buf)?.textOnly ?? false;
+}
+
+export interface PageProfile {
+  w: number;
+  h: number;
+  colourFraction: number;
+  coverage: number; // fraction of pixels that are ink
+  maxSolidRunFraction: number; // longest run of near-solid ink rows, over height
+  maxTintRunFraction: number; // longest run of near-solid off-white rows, over height
+  bands: number; // ink bands (text lines)
+  medianBandHeight: number;
+  textOnly: boolean;
+  reason: string; // why not textOnly, or "text page"
+}
+
+/** The measurements behind pageIsTextOnly, exposed so thresholds can be tuned
+ *  against real page renders instead of guessed at. Null if undecodable. */
+export function pageProfile(buf: Buffer): PageProfile | null {
+  const hdr = pngHeader(buf);
+  if (!hdr) return null;
+
+  const rows = decodePngRgbRows(buf, hdr);
+  if (!rows) return null;
+
+  const inkPerRow = new Float64Array(hdr.h);
+  const tintPerRow = new Float64Array(hdr.h);
+  let inkTotal = 0;
+  let colourPixels = 0;
+
+  for (let y = 0; y < hdr.h; y++) {
+    const row = rows[y]!;
+    let rowInk = 0;
+    let rowTint = 0;
+    for (let x = 0; x < hdr.w; x++) {
+      const r = row[x * 3]!, g = row[x * 3 + 1]!, b = row[x * 3 + 2]!;
+      if (Math.max(r, g, b) - Math.min(r, g, b) > SATURATION_LEVEL) colourPixels++;
+      const grey = (r * 299 + g * 587 + b * 114) / 1000;
+      if (grey < INK_LEVEL) rowInk++;
+      if (grey < TINT_LEVEL) rowTint++;
+    }
+    inkPerRow[y] = rowInk / hdr.w;
+    tintPerRow[y] = rowTint / hdr.w;
+    inkTotal += rowInk;
+  }
+
+  const pixels = hdr.w * hdr.h;
+  const colourFraction = colourPixels / pixels;
+  const coverage = inkTotal / pixels;
+
+  // A near-solid run of rows is a filled block: chart, photo or block diagram.
+  let solidRun = 0;
+  let maxSolidRun = 0;
+  // The same test at the tint threshold, which catches pale grey figure panels
+  // that carry no "ink" at all. Text rows never fill half a line width with
+  // continuous tint; a panel does, for its whole height.
+  let tintRun = 0;
+  let maxTintRun = 0;
+  for (let y = 0; y < hdr.h; y++) {
+    if (inkPerRow[y]! > 0.5) maxSolidRun = Math.max(maxSolidRun, ++solidRun);
+    else solidRun = 0;
+    if (tintPerRow[y]! > 0.5) maxTintRun = Math.max(maxTintRun, ++tintRun);
+    else tintRun = 0;
+  }
+
+  // Count ink bands (text lines) and measure their heights.
+  const bandList: number[] = [];
+  let run = 0;
+  for (let y = 0; y < hdr.h; y++) {
+    if (inkPerRow[y]! > 0.002) run++;
+    else if (run) { bandList.push(run); run = 0; }
+  }
+  if (run) bandList.push(run);
+  const sorted = [...bandList].sort((a, b) => a - b);
+  const medianBandHeight = sorted.length ? sorted[sorted.length >> 1]! : 0;
+  const maxSolidRunFraction = maxSolidRun / hdr.h;
+  const maxTintRunFraction = maxTintRun / hdr.h;
+
+  const p: PageProfile = {
+    w: hdr.w,
+    h: hdr.h,
+    colourFraction,
+    coverage,
+    maxSolidRunFraction,
+    maxTintRunFraction,
+    bands: bandList.length,
+    medianBandHeight,
+    textOnly: false,
+    reason: "text page",
+  };
+
+  // Every rejection below is a bias towards showing the page.
+  if (hdr.w < 200 || hdr.h < 200) p.reason = "too small to profile";
+  else if (colourFraction > 0.005) p.reason = "carries colour, so a figure";
+  else if (coverage < 0.003) p.reason = "no ink, effectively blank";
+  else if (coverage > 0.35) p.reason = "too dense for prose";
+  else if (maxSolidRunFraction > 0.02) p.reason = "has a solid block, so a figure";
+  else if (maxTintRunFraction > 0.015) p.reason = "has a filled panel, so a figure";
+  else if (bandList.length < 8) p.reason = "too few ink bands to be prose";
+  else if (medianBandHeight > 45) p.reason = "ink bands too tall to be glyph rows";
+  else p.textOnly = true;
+
+  return p;
 }
 
 export async function inspectImage(abs: string): Promise<ImageInfo> {
