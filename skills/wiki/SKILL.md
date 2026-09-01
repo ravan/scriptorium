@@ -59,9 +59,23 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 | `compose-docx.ts <spec.json> -o out.docx` | back-compat shim over compose-doc.ts |
 | `verify-pptx.ts <deck.pptx> [spec.json]` | open the rendered deck and report what is really inside it: media per slide, notes, animation, and every image the spec asked for that did not arrive. Exit 2 on a problem |
 | `preview.ts <file> [-o dir] [--pages 1-4]` | turn a .pptx, .pdf, .svg or .gif into PNGs to read back as images. Decks go through LibreOffice or Keynote, the engines that will actually show them |
-| `voice-lint.ts <file.md \| spec.json>` | the mechanical half of the voice profile: connector dashes, sentences over one comma, banned words, emoji, long paragraphs. Reads the ban list from the active idiolect profile's `ban-list.md`, in `profiles/` first then `~/.idiolect/profiles/` (legacy `profile/voice.md` kill lists still parse). Exit 2 on a hard-rule finding |
+| `spec-prose.ts <spec.json> [-o out.md]` | pull the prose out of a deck or doc spec into a markdown file, so hogwash can scan it. Prints a line-number index that reads a finding back as "slide 3 bullet 2". hogwash scans files, and a spec's prose sits in nested JSON no scanner would find |
 
 Spec JSON shapes are documented in the header comments of the two compose scripts.
+
+**Voice linting is hogwash's job.** The bundled hogwash skill scans a draft
+against 900-plus machine-writing rules plus the wiki's own house mechanics, and
+the wiki's `hogwash.json` turns on the `mechanics` pack for connector dashes,
+sentences over one comma, and paragraphs past three sentences. There is no
+`voice-lint.ts` any more:
+
+```bash
+bun .claude/skills/hogwash/scripts/hogwash.ts scan --fail-on error <draft.md>
+```
+
+`--fail-on error` is what makes a single house-rule breach fail the run. Without
+it the exit code is density-based, and one em dash in a long document sits far
+below the threshold.
 
 **Existing wiki missing a script?** Re-run `setup.ts` on it. It overwrites `scripts/` only and never touches your content.
 

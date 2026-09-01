@@ -31,7 +31,7 @@ uses, so both tools agree on which voice is active.
 
 The active profile is named by the `voice_profile:` key in the wiki's
 `CLAUDE.md`. `none` means no profile yet; composing then uses a plain neutral
-style and `scripts/voice-lint.ts` falls back to its built-in kill list. Two
+style and hogwash scans with its own rule packs and no ban list. Two
 details of `none` worth knowing: it still adopts a profile the wiki itself
 carries, since a stale key should not hide a voice sitting in `profiles/`, and
 it never reaches out to `~/.idiolect/`, since a wiki that declined a voice
@@ -72,4 +72,5 @@ the retired template mechanism. Do not delete them silently. Offer to migrate:
 idiolect treats them as one existing owner-approved profile, rebuilds it as
 `profiles/<name>/` through its Create/Critique flow, and the old `profile/`
 folder is removed in the same commit once the owner approves the new one.
-Until migration, `voice-lint.ts` still reads the old kill list.
+Until migration, point the wiki's `hogwash.json` `profile` paths at the old
+`profile/` folder, so the ban list still runs.

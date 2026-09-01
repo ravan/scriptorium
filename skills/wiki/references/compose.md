@@ -121,15 +121,22 @@ image resolved to nothing, and an animated GIF can arrive flattened. Three scrip
 settle the mechanical half, in this order:
 
 ```bash
-bun scripts/voice-lint.ts outputs/<name>.spec.json          # the words
+bun scripts/spec-prose.ts outputs/<name>.spec.json          # the words, step 1
+bun .claude/skills/hogwash/scripts/hogwash.ts scan --fail-on error outputs/<name>.spec.prose.md
 bun scripts/verify-pptx.ts outputs/<name>.pptx outputs/<name>.spec.json   # the file
 bun scripts/preview.ts outputs/<name>.pptx -o /tmp/preview  # the slides
 ```
 
-- **`voice-lint.ts`** reads the banned words out of the active idiolect
-  profile's `ban-list.md` and checks what a regex can settle. It catches
-  captions and bullets, which is where a hand check misses things. Exit 2
-  means a hard rule was broken.
+- **`spec-prose.ts` then hogwash** settle the words. hogwash scans files, and a
+  spec's prose sits in nested JSON no scanner would find, so `spec-prose.ts`
+  writes it out as markdown first and prints a line-number index that reads a
+  finding back as "slide 3 bullet 2". It catches captions and bullets, which is
+  where a hand check misses things. hogwash brings the machine-writing rules and
+  the ban list; the wiki's `hogwash.json` adds the `mechanics` pack for connector
+  dashes, sentences over one comma, and paragraphs past three sentences.
+  `--fail-on error` is what makes one breach fail the run, because the plain exit
+  code is density-based and a single dash in a long deck sits under the
+  threshold.
 - **`verify-pptx.ts`** opens the deck and reports media per slide, whether notes
   arrived, whether an animation kept its frames, and any image the spec asked for
   that is not there. It also warns when a visual fills far less of its slot than

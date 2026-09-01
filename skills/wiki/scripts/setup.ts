@@ -112,8 +112,8 @@ for (const f of [
   "verify-pptx.test.ts",
   "preview.ts",
   "preview.test.ts",
-  "voice-lint.ts",
-  "voice-lint.test.ts",
+  "spec-prose.ts",
+  "spec-prose.test.ts",
   "compose-doc.ts",
   "compose-docx.ts",
   "package.json",
@@ -214,6 +214,42 @@ for (const { name: skill, why } of VOICE_SKILLS) {
       );
     }
   }
+}
+
+// 5e. hogwash.json, so hogwash scans this wiki with the wiki's own settings:
+// prose register, the house-mechanics pack (connector dashes, more than one
+// comma in a sentence, long paragraphs), and profile paths under profiles/
+// rather than hogwash's own profile/. A relative path missing in the wiki
+// resolves against ~/.idiolect/, which is how a wiki shares a voice with other
+// projects. Never overwritten: a wiki that has tuned its own copy keeps it.
+{
+  const dir = voiceProfile === "none" ? "profile" : `profiles/${voiceProfile}`;
+  ensureFile(
+    "hogwash.json",
+    JSON.stringify(
+      {
+        register: "prose",
+        packs: [
+          "wikipedia-signs",
+          "claudisms",
+          "humanizer",
+          "stylometry",
+          "excess-vocab",
+          "vale-ai-tells",
+          "slop-gate",
+          "unslop",
+          "mechanics",
+        ],
+        profile: {
+          voice: `${dir}/voice.md`,
+          quality: `${dir}/quality.md`,
+          banList: `${dir}/ban-list.md`,
+        },
+      },
+      null,
+      2,
+    ) + "\n",
+  );
 }
 
 // The ignore list grows as the wiki gains parts, so append what is missing

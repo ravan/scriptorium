@@ -87,7 +87,7 @@ Composed outputs are governed by a voice profile in `profiles/<name>/`, created 
 
 A profile is a folder: `voice.md` (how you sound), `quality.md` (what "good" means per format), `ban-list.md` (words you forbid), `registers/` (per-format overlays: blog, LinkedIn, whitepaper, talk), plus an evidence ledger and a changelog. A wiki can hold several named voices.
 
-Say *"capture my voice"*. Idiolect builds the profile from writing you point it at, or through its guided interview when you have no samples, and it refines the profile every time you react to a piece ("I'd never say that"). `scripts/voice-lint.ts` enforces the ban list mechanically on every composed draft.
+Say *"capture my voice"*. Idiolect builds the profile from writing you point it at, or through its guided interview when you have no samples, and it refines the profile every time you react to a piece ("I'd never say that"). The bundled hogwash skill enforces the ban list mechanically on every composed draft, alongside its own machine-writing rules and the house mechanics the wiki turns on: connector dashes, sentences over one comma, paragraphs past three sentences.
 
 ## Everything visual comes from a template folder you can edit
 
