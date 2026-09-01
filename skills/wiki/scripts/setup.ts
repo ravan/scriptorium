@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Creates (or repairs) a wiki folder. Safe to run twice: it never overwrites.
 // Usage: bun setup.ts <wiki-folder> --name "My Wiki" [--brand <brand-skill-name>]
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { MANIFEST_REL, have, run } from "./common";
 
@@ -100,6 +100,8 @@ for (const f of [
   "ingest.ts",
   "manifest.ts",
   "outline.ts",
+  "outline.test.ts",
+  "textpage.test.ts",
   "media.ts",
   "links.ts",
   "wiki.ts",
@@ -136,6 +138,28 @@ for (const kind of ["slides", "docs", "shared"]) {
   cpSync(srcTpl, dstTpl, { recursive: true });
   made.push(`templates/${kind}/` + (fresh ? "" : " (refreshed)"));
 }
+/**
+ * Copy a skill into the wiki as a REAL directory.
+ *
+ * The source is resolved with realpathSync first, because a skill is very often
+ * installed as a symlink to a sibling repo. cpSync would otherwise copy the link
+ * itself, leaving the wiki pointing at a path outside itself: it works on the
+ * machine that set it up and breaks the moment the wiki is moved or the sibling
+ * repo is renamed. Only the top level is dereferenced, so symlinks *inside* a
+ * skill keep whatever meaning the skill gave them.
+ */
+function bundleSkill(src: string, dst: string): void {
+  // A dst left as a symlink by an older buggy run must be removed, not copied
+  // into: cpSync would follow it and write through into the linked skill repo.
+  if (existsSync(dst) && lstatSync(dst).isSymbolicLink()) rmSync(dst, { force: true });
+  cpSync(realpathSync(src), dst, {
+    recursive: true,
+    // Caches and installed dependencies are machine-local and can be large;
+    // the skill regenerates both on first use.
+    filter: (from) => !/(^|\/)(node_modules|\.cache|\.git)(\/|$)/.test(from),
+  });
+}
+
 // 5c. Bundle the skills this wiki depends on into .claude/skills/, so a Claude
 // Code session started INSIDE the wiki folder finds them. Without this the wiki
 // references a visuals or brand skill it cannot load, and composing fails with
@@ -149,42 +173,43 @@ for (const s of bundleSkills) {
   }
   const dst = join(root, ".claude", "skills", s);
   const fresh = !existsSync(dst);
-  cpSync(src, dst, {
-    recursive: true,
-    // Caches and installed dependencies are machine-local and can be large;
-    // the skill regenerates both on first use.
-    filter: (from) => !/(^|\/)(node_modules|\.cache|\.git)(\/|$)/.test(from),
-  });
+  bundleSkill(src, dst);
   made.push(`.claude/skills/${s}/` + (fresh ? "" : " (refreshed)"));
 }
 
-// 5d. Idiolect is not optional: it owns the voice profiles under profiles/,
-// so every wiki bundles it. Prefer a locally installed copy (kept fresh like
-// the other bundles); fall back to installing it from ravan/hogwash with the
-// skills CLI. A wiki without idiolect composes in a neutral voice only.
-{
-  const dst = join(root, ".claude", "skills", "idiolect");
+// 5d. The two voice skills are not optional, so every wiki gets both:
+//   idiolect - owns the voice profiles under profiles/
+//   hogwash  - scans and rewrites prose against those profiles
+// Both ship from the same repo, so the official install is the skills CLI
+// against ravan/hogwash. A locally installed copy wins when one exists, which
+// is what keeps a development machine (where these skills are being edited)
+// from being overwritten by a published version; re-running setup is then how
+// the wiki picks up the newer local build.
+const VOICE_SKILLS: Array<{ name: string; why: string }> = [
+  { name: "idiolect", why: "voice profiles" },
+  { name: "hogwash", why: "prose scanning and rewriting" },
+];
+
+for (const { name: skill, why } of VOICE_SKILLS) {
+  const dst = join(root, ".claude", "skills", skill);
   const candidates = [
-    join(skillsRoot, "idiolect"),
-    join(process.env.HOME ?? "", ".claude", "skills", "idiolect"),
+    join(skillsRoot, skill),
+    join(process.env.HOME ?? "", ".claude", "skills", skill),
   ];
   const src = candidates.find((c) => existsSync(join(c, "SKILL.md")));
   if (src) {
     const fresh = !existsSync(dst);
-    cpSync(src, dst, {
-      recursive: true,
-      filter: (from) => !/(^|\/)(node_modules|\.cache|\.git)(\/|$)/.test(from),
-    });
-    made.push(".claude/skills/idiolect/" + (fresh ? "" : " (refreshed)"));
+    bundleSkill(src, dst);
+    made.push(`.claude/skills/${skill}/` + (fresh ? "" : " (refreshed)"));
   } else if (!existsSync(join(dst, "SKILL.md"))) {
-    console.log("Installing the idiolect skill (voice profiles) from ravan/hogwash...");
-    run(["npx", "-y", "skills", "add", "ravan/hogwash", "--skill", "idiolect"], root);
+    console.log(`Installing the ${skill} skill (${why}) from ravan/hogwash...`);
+    run(["npx", "-y", "skills", "add", "ravan/hogwash", "--skill", skill], root);
     if (existsSync(join(dst, "SKILL.md"))) {
-      made.push(".claude/skills/idiolect/");
+      made.push(`.claude/skills/${skill}/`);
     } else {
       console.warn(
-        "warning: could not install the idiolect skill. Voice profiles need it.\n" +
-          "  Install it later from the wiki folder with: npx skills add ravan/hogwash --skill idiolect",
+        `warning: could not install the ${skill} skill (${why}).\n` +
+          `  Install it later from the wiki folder with: npx skills add ravan/hogwash --skill ${skill}`,
       );
     }
   }

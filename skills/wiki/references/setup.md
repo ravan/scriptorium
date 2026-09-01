@@ -23,9 +23,25 @@ A wiki is a folder the user opens on its own - they start a session *inside* it,
 
 Bundle the visuals skill and the brand skill. Do not bundle the `wiki` skill itself - the wiki's own `CLAUDE.md` and `scripts/` already carry everything it needs.
 
-### Idiolect is bundled automatically
+### The two voice skills are bundled automatically
 
-The `idiolect` skill owns the wiki's voice profiles (see references/profile.md), so setup always bundles it - no flag needed. It looks for an installed copy beside the wiki skill and in `~/.claude/skills/`; if neither exists it installs it into the wiki with `npx skills add ravan/hogwash --skill idiolect`, which needs the network once. Mention this in the consent sentence before running setup ("I will also set up idiolect, the skill that learns how you write"). If setup prints the could-not-install warning, run that npx command from the wiki folder once you are online, then re-run setup.
+Setup always bundles both, with no flag:
+
+- **`idiolect`** owns the wiki's voice profiles under `profiles/` (see references/profile.md).
+- **`hogwash`** scans prose for machine-writing artifacts and runs the rewrite loop against those profiles.
+
+They ship from the same repo, so the official install for each is the skills CLI:
+
+```
+npx skills add ravan/hogwash --skill idiolect
+npx skills add ravan/hogwash --skill hogwash
+```
+
+Setup runs that itself when it needs to, which needs the network once. Before doing so it prefers a copy already installed beside the wiki skill or in `~/.claude/skills/`, so a machine that is *developing* these skills keeps its own build; re-running setup is then how a wiki picks up the newer local version. Mention the install in the consent sentence before running setup ("I will also set up idiolect and hogwash, the skills that learn how you write and keep the prose sounding like you"). If setup prints a could-not-install warning, run the matching npx command from the wiki folder once you are online, then re-run setup.
+
+A bundled skill is always a **real directory**, never a symlink, even when the source is symlinked in. Otherwise the wiki would point outside itself and break the moment it moved. `node_modules` is not copied; hogwash installs its own on first use.
+
+Hogwash needs no configuration to start: without a `hogwash.json` in the wiki root its defaults apply, and profile paths resolve in the wiki first, then under `~/.idiolect/`.
 
 ## 3. Scaffold
 

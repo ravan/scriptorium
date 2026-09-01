@@ -1,6 +1,6 @@
 ---
 name: wiki
-description: Use when the user wants an agent-maintained knowledge wiki - creating one, ingesting source material (pptx, pdf, docx, markdown, images), asking questions of accumulated knowledge, recomposing it into blogs, LinkedIn posts, slide decks, docx or SVG images, health-checking pages, or building a personal voice profile (captured and maintained by the bundled idiolect skill). Also use when a folder contains raw/.ingest-manifest.json or the user mentions "my wiki".
+description: Use when the user wants an agent-maintained knowledge wiki - creating one, ingesting source material (pptx, pdf, docx, markdown, images), asking questions of accumulated knowledge, recomposing it into blogs, LinkedIn posts, slide decks, docx or SVG images, health-checking pages, or building a personal voice profile (captured by the bundled idiolect skill, enforced by the bundled hogwash skill). Also use when a folder contains raw/.ingest-manifest.json or the user mentions "my wiki".
 ---
 
 # Wiki
@@ -46,7 +46,7 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 | Script | Job |
 |---|---|
 | `doctor.ts` | check required tools, print plain-language install hints |
-| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>] [--bundle-skills a,b] [--voice-profile <name>]` | scaffold/repair a wiki, idempotent; refreshes `scripts/`, `templates/` and any bundled skills; always bundles (or installs) the `idiolect` skill, which owns the voice profiles in `profiles/` |
+| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>] [--bundle-skills a,b] [--voice-profile <name>]` | scaffold/repair a wiki, idempotent; refreshes `scripts/`, `templates/` and any bundled skills; always bundles (or installs via `npx skills add ravan/hogwash`) the `idiolect` and `hogwash` skills: idiolect owns the voice profiles in `profiles/`, hogwash scans and rewrites prose against them. Bundled skills are always real copies, never symlinks |
 | `ingest.ts [--dry-run] [--re-extract <file>]` | scan raw/, update manifest, extract text+media to derived/; junk images (blank/tiny/duplicate/unviewable) are gated into `skipped/` with a `skipped.json` note |
 | `manifest.ts status\|pending\|mark-ingested` | inspect and update ingest state |
 | `outline.ts [slug\|--all]` | heading map + `sed` read plan for extracted text too big to `cat`. Every slice is guaranteed under the byte budget, so a printed command never truncates |
@@ -68,12 +68,13 @@ Spec JSON shapes are documented in the header comments of the two compose script
 ## Tests
 
 ```bash
-bun test scripts/                 # 141 tests, offline, no external tools
+bun test scripts/                 # 148 tests, offline, no external tools
 ```
 
-Covers the byte-level image checks (animation detection for gif/apng/webp, text-only page-render detection) and the read-plan slicer. It needs no ImageMagick and no Chrome: the fixtures are built in the test, so a failure always means the parser broke. Run it after any change to `image.ts` or `outline.ts`.
+Covers the byte-level image checks (animation detection for gif/apng/webp, text-only page-render detection) and the read-plan slicer. It needs no ImageMagick and no Chrome: the fixtures are built in the test, so a failure always means the parser broke. Run it after any change to `image.ts`, `outline.ts` or `setup.ts`.
 
-Two of these suites exist because real sources broke the scripts, and both encode the lesson as a test rather than as advice:
+Three of these suites exist because real use broke the scripts, and each encodes the lesson as a test rather than as advice:
 
 - `outline.test.ts` - every emitted slice must fit the **byte** budget. Slices once ran 2-12x over, because spans between headings were never subdivided and the budget counted UTF-16 chars while the pipe carries UTF-8.
 - `textpage.test.ts` - a page render must only be filtered when it is provably just text. Its safety cases are the ones that matter; a pale grey diagram was wrongly hidden until tint detection was added.
+- `setup.test.ts` - a bundled skill must be a real directory that still works when its source repo is moved away. `cpSync` copies a symlinked skill as a link, which works only on the machine that ran setup.
