@@ -19,9 +19,23 @@ profiles/<name>/
   changelog.md      # dated history of every durable change
 ```
 
+A profile can also live user-wide, so several projects share one voice:
+
+```
+~/.idiolect/profiles/<name>/
+```
+
+**The wiki copy always wins.** A profile the wiki does not carry is looked up
+under `~/.idiolect/profiles/` instead. This is the same resolution order hogwash
+uses, so both tools agree on which voice is active.
+
 The active profile is named by the `voice_profile:` key in the wiki's
 `CLAUDE.md`. `none` means no profile yet; composing then uses a plain neutral
-style and `scripts/voice-lint.ts` falls back to its built-in kill list.
+style and `scripts/voice-lint.ts` falls back to its built-in kill list. Two
+details of `none` worth knowing: it still adopts a profile the wiki itself
+carries, since a stale key should not hide a voice sitting in `profiles/`, and
+it never reaches out to `~/.idiolect/`, since a wiki that declined a voice
+should not borrow one from another context.
 
 ## Running a profile build or change
 

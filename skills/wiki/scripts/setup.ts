@@ -97,6 +97,7 @@ for (const f of [
   "image.test.ts",
   "doctor.ts",
   "setup.ts",
+  "setup.test.ts",
   "ingest.ts",
   "manifest.ts",
   "outline.ts",

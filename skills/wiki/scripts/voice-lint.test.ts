@@ -8,7 +8,7 @@
 // Fully offline. Every fixture is a string built in the test, so a failure
 // always means the linter changed and never that a file moved.
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -398,5 +398,59 @@ describe("lintText", () => {
     for (const f of lintText("We leverage, always, this thing.", { killList: list })) {
       expect(f.text.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("findBanListPath falls back to the user-wide idiolect profiles", () => {
+  // Idiolect keeps profiles per project, and user-wide under ~/.idiolect/profiles
+  // when a project has none, so several projects can share one voice. Hogwash
+  // already resolves that way. Without the same fallback here, a wiki naming a
+  // shared profile silently lints against the built-in default kill list: it
+  // looks like it worked and enforces the wrong words.
+  function wiki(voiceProfile: string) {
+    const root = mkdtempSync(join(tmpdir(), "vl-wiki-"));
+    writeFileSync(join(root, "CLAUDE.md"), `- **voice_profile**: ${voiceProfile}\n`);
+    mkdirSync(join(root, "raw"), { recursive: true });
+    writeFileSync(join(root, "raw", ".ingest-manifest.json"), "{}");
+    return root;
+  }
+  function fakeHome(profile: string, banBody: string) {
+    const home = mkdtempSync(join(tmpdir(), "vl-home-"));
+    const d = join(home, ".idiolect", "profiles", profile);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "ban-list.md"), banBody);
+    return home;
+  }
+
+  test("REGRESSION: a user-wide profile is found when the wiki has none", () => {
+    const root = wiki("rav");
+    const home = fakeHome("rav", "- flywheel\n- north star\n");
+    const p = findBanListPath(root, home);
+    expect(p).not.toBeNull();
+    expect(parseBanList(readFileSync(p!, "utf8"))).toContain("flywheel");
+  });
+
+  test("the project copy wins over the user-wide one", () => {
+    const root = wiki("rav");
+    const local = join(root, "profiles", "rav");
+    mkdirSync(local, { recursive: true });
+    writeFileSync(join(local, "ban-list.md"), "- localword\n");
+    const home = fakeHome("rav", "- homeword\n");
+
+    const p = findBanListPath(root, home);
+    expect(p!.startsWith(root)).toBe(true);
+    expect(parseBanList(readFileSync(p!, "utf8"))).toContain("localword");
+  });
+
+  test("a named profile missing in both places resolves to null", () => {
+    const root = wiki("nobody");
+    const home = fakeHome("someone-else", "- x\n");
+    expect(findBanListPath(root, home)).toBeNull();
+  });
+
+  test("voice_profile none does not reach for a user-wide profile", () => {
+    const root = wiki("none");
+    const home = fakeHome("rav", "- homeword\n");
+    expect(findBanListPath(root, home)).toBeNull();
   });
 });

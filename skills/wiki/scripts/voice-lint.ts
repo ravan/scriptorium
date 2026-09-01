@@ -7,8 +7,10 @@
 //
 // It reads the banned words out of the active idiolect profile's ban-list.md
 // (profiles/<name>/, named by the wiki CLAUDE.md voice_profile key), so the
-// words it bans are the owner's words and not a list baked in here. Legacy
-// wikis with a profile/voice.md kill list still work.
+// words it bans are the owner's words and not a list baked in here. A profile
+// the wiki does not carry is looked up user-wide under ~/.idiolect/profiles/,
+// where idiolect keeps a voice shared across projects; the wiki copy wins.
+// Legacy wikis with a profile/voice.md kill list still work.
 //
 // What it settles: connector dashes, more than one comma in a sentence,
 // kill-list words, emoji, paragraphs over three sentences.
@@ -20,6 +22,7 @@
 //
 // Exit codes: 0 clean, 2 hard-rule findings, 1 usage error.
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { findWikiRoot } from "./common";
 
@@ -219,24 +222,58 @@ export function parseBanList(banMd: string): string[] {
 }
 
 /**
- * Finds the active idiolect profile's ban-list.md inside a wiki: the profile
- * named by the CLAUDE.md voice_profile key, or the only profile there is.
+ * Finds the active idiolect profile's ban-list.md: the profile named by the
+ * CLAUDE.md voice_profile key, or the only profile there is.
+ *
+ * Looked up in the wiki first, then user-wide under `~/.idiolect/profiles/`,
+ * which is where idiolect keeps a voice several projects share. The project copy
+ * always wins, matching how hogwash resolves the same paths. Without the second
+ * place, a wiki naming a shared profile falls through to DEFAULT_KILL_LIST and
+ * enforces the wrong words while looking like it worked.
+ *
+ * `home` is injectable so the tests never depend on the real home directory.
  */
-export function findBanListPath(root: string): string | null {
-  const profilesDir = join(root, "profiles");
+export function findBanListPath(root: string, home: string = homedir()): string | null {
+  const local = join(root, "profiles");
+  const userWide = join(home, ".idiolect", "profiles");
+
   let name: string | undefined;
+  let declaredNone = false;
   const claudeMd = join(root, "CLAUDE.md");
   if (existsSync(claudeMd)) {
     const m = readFileSync(claudeMd, "utf8").match(/\*\*voice_profile\*\*:\s*([\w][\w.-]*)/i);
-    if (m && m[1]!.toLowerCase() !== "none") name = m[1];
+    if (m) {
+      if (m[1]!.toLowerCase() === "none") declaredNone = true;
+      else name = m[1];
+    }
   }
-  if (!name && existsSync(profilesDir)) {
-    const withBans = readdirSync(profilesDir).filter((d) =>
-      existsSync(join(profilesDir, d, "ban-list.md")));
-    if (withBans.length === 1) name = withBans[0];
+
+  // `voice_profile: none` still adopts a profile the wiki itself carries: a
+  // stale key should not hide a voice sitting right there. It does stop the
+  // search at the wiki boundary though, because reaching into the user-wide
+  // profiles would apply another context's voice to a wiki that declined one.
+  const dirs = declaredNone ? [local] : [local, userWide];
+
+  // No name given: adopt the single profile, if exactly one exists. Checked per
+  // location, so an ambiguous directory never gets guessed at.
+  if (!name) {
+    for (const dir of dirs) {
+      if (!existsSync(dir)) continue;
+      const withBans = readdirSync(dir).filter((d) => existsSync(join(dir, d, "ban-list.md")));
+      if (withBans.length === 1) {
+        name = withBans[0];
+        break;
+      }
+      if (withBans.length > 1) break; // ambiguous; do not guess
+    }
   }
-  const p = name ? join(profilesDir, name, "ban-list.md") : null;
-  return p && existsSync(p) ? p : null;
+  if (!name) return null;
+
+  for (const dir of dirs) {
+    const p = join(dir, name, "ban-list.md");
+    if (existsSync(p)) return p;
+  }
+  return null;
 }
 
 export interface KillHit extends Finding {

@@ -59,7 +59,7 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 | `compose-docx.ts <spec.json> -o out.docx` | back-compat shim over compose-doc.ts |
 | `verify-pptx.ts <deck.pptx> [spec.json]` | open the rendered deck and report what is really inside it: media per slide, notes, animation, and every image the spec asked for that did not arrive. Exit 2 on a problem |
 | `preview.ts <file> [-o dir] [--pages 1-4]` | turn a .pptx, .pdf, .svg or .gif into PNGs to read back as images. Decks go through LibreOffice or Keynote, the engines that will actually show them |
-| `voice-lint.ts <file.md \| spec.json>` | the mechanical half of the voice profile: connector dashes, sentences over one comma, banned words, emoji, long paragraphs. Reads the ban list from the active idiolect profile's `ban-list.md` (legacy `profile/voice.md` kill lists still parse). Exit 2 on a hard-rule finding |
+| `voice-lint.ts <file.md \| spec.json>` | the mechanical half of the voice profile: connector dashes, sentences over one comma, banned words, emoji, long paragraphs. Reads the ban list from the active idiolect profile's `ban-list.md`, in `profiles/` first then `~/.idiolect/profiles/` (legacy `profile/voice.md` kill lists still parse). Exit 2 on a hard-rule finding |
 
 Spec JSON shapes are documented in the header comments of the two compose scripts.
 
@@ -68,7 +68,7 @@ Spec JSON shapes are documented in the header comments of the two compose script
 ## Tests
 
 ```bash
-bun test scripts/                 # 148 tests, offline, no external tools
+bun test scripts/                 # 152 tests, offline, no external tools
 ```
 
 Covers the byte-level image checks (animation detection for gif/apng/webp, text-only page-render detection) and the read-plan slicer. It needs no ImageMagick and no Chrome: the fixtures are built in the test, so a failure always means the parser broke. Run it after any change to `image.ts`, `outline.ts` or `setup.ts`.
