@@ -39,11 +39,13 @@ itself carries, since a stale key should not hide a voice sitting in
 `profiles/`, and it never reaches out to `~/.idiolect/`, since a wiki that
 declined a voice should not borrow one from another context.
 
-**Hogwash is the voice gate; idiolect is what it applies.** Hogwash's rule
-packs carry the real ban list, the machine-writing tells. The idiolect profile
-is the owner's addition: their own bans, voice and registers. Hogwash's rewrite
-loop applies both, so every composed piece goes through hogwash and nothing
-else re-checks it. The wiki writes no `hogwash.json`; hogwash reads its profile
+**Idiolect is the voice; hogwash is the share gate.** The idiolect profile
+governs every composed piece, shared or not: the owner's voice, registers and
+their own bans. Hogwash runs only when the owner asks, or says a piece is for a
+wider audience (SKILL.md, "Hogwash runs only when asked"); its rule packs carry
+the real ban list, the machine-writing tells, and its rewrite loop applies the
+idiolect profile on top. Wiki pages are never scanned. When hogwash does run,
+the wiki gives it no config: there is no `hogwash.json`; hogwash reads its profile
 at the default path `profile/` (wiki first, then `~/.idiolect/profile/`). To
 make the named profile that default, symlink once:
 `ln -s ~/.idiolect/profiles/<name> ~/.idiolect/profile`. A wiki-only voice

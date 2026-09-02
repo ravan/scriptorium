@@ -28,7 +28,7 @@ Bundle the visuals skill and the brand skill. Do not bundle the `wiki` skill its
 Setup always bundles both, with no flag:
 
 - **`idiolect`** builds and maintains voice profiles: `profiles/<name>/` in the wiki, or `~/.idiolect/profiles/<name>/` shared across projects (see references/profile.md).
-- **`hogwash`** scans prose for machine-writing artifacts and runs the rewrite loop.
+- **`hogwash`** scans prose for machine-writing artifacts and runs the rewrite loop - only on request, for a piece the user says is going to a wider audience. Never on wiki pages.
 
 They ship from the same repo, so the official install for each is the skills CLI:
 

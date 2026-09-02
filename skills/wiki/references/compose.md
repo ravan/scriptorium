@@ -117,29 +117,35 @@ Then `bun scripts/compose-pptx.ts <spec> -o outputs/<name>.pptx`, fix lint warni
 ### Before you call a deck done
 
 A clean render log is not evidence. pptxgenjs reports success for a slide whose
-image resolved to nothing, and an animated GIF can arrive flattened. Three scripts
-settle the mechanical half, in this order:
+image resolved to nothing, and an animated GIF can arrive flattened. Two scripts
+settle the mechanical half, always:
 
 ```bash
-bun scripts/spec-prose.ts outputs/<name>.spec.json          # the words, step 1
-bun .claude/skills/hogwash/scripts/hogwash.ts scan --register prose --fail-on error outputs/<name>.spec.prose.md
 bun scripts/verify-pptx.ts outputs/<name>.pptx outputs/<name>.spec.json   # the file
 bun scripts/preview.ts outputs/<name>.pptx -o /tmp/preview  # the slides
 ```
 
-- **`spec-prose.ts` then hogwash** settle the words. hogwash scans files, and a
-  spec's prose sits in nested JSON no scanner would find, so `spec-prose.ts`
-  writes it out as markdown first and prints a line-number index that reads a
-  finding back as "slide 3 bullet 2" or "section 4 block 2". It reads both spec
-  shapes, slides and document `blocks`, so captions, bullets and body paragraphs
-  all arrive, which is where a hand check misses things. hogwash runs on its
-  defaults (the wiki writes no `hogwash.json`); `--register prose` calibrates it
-  for published prose rather than code comments, and `--fail-on error` is what
-  makes one breach fail the run, because the plain exit code is density-based
-  and a single dash in a long deck sits under the threshold. Hogwash's packs
-  are the real ban list; the idiolect profile at hogwash's default `profile/`
-  path adds the owner's bans and voice, and hogwash's rewrite loop applies them
-  (see references/profile.md).
+And two more **only when the user says the deck is going to a wider audience,
+or asks for a scan** (SKILL.md, "Hogwash runs only when asked"):
+
+```bash
+bun scripts/spec-prose.ts outputs/<name>.spec.json          # the words
+bun .claude/skills/hogwash/scripts/hogwash.ts scan --register prose --fail-on error outputs/<name>.spec.prose.md
+```
+
+- **`spec-prose.ts` then hogwash** settle the words of a shared deck. hogwash
+  scans files, and a spec's prose sits in nested JSON no scanner would find, so
+  `spec-prose.ts` writes it out as markdown first and prints a line-number index
+  that reads a finding back as "slide 3 bullet 2" or "section 4 block 2". It
+  reads both spec shapes, slides and document `blocks`, so captions, bullets and
+  body paragraphs all arrive, which is where a hand check misses things.
+  `--register prose` calibrates the scanner for published prose, and
+  `--fail-on error` is what makes one breach fail the run, because the plain
+  exit code is density-based and a single dash in a long deck sits under the
+  threshold. Hogwash's packs are the real ban list; the idiolect profile at
+  hogwash's default `profile/` path adds the owner's bans and voice (see
+  references/profile.md). A deck the owner will present from their own laptop
+  to their own team is working text: skip these two.
 - **`verify-pptx.ts`** opens the deck and reports media per slide, whether notes
   arrived, whether an animation kept its frames, and any image the spec asked for
   that is not there. It also warns when a visual fills far less of its slot than
@@ -169,11 +175,12 @@ Composing a document:
 2. **Read the template's `structure.md` first** and build the spec's sections to its skeleton. The rules in template.json are enforced by lint; structure.md is enforced by you.
 3. Facts from wiki pages only; cite raw sources in a references section where the form has one.
 4. Visuals follow "Visuals" above: a Lolly render for any shape a tool covers, annotated by you where the figure needs saying more, your own SVG for bespoke structure. Figure density is linted per template - a document under its figure count is usually one that explained in prose what a chart would have shown.
-5. Render, fix every `lint:` line, then `bun scripts/spec-prose.ts <spec>` and the hogwash scan exactly as for a deck (the "Before you call a deck done" block above); re-read the output against voice + quality profiles before delivering. For .md outputs, image links point at the generated assets - keep them inside `outputs/`.
+5. Render, fix every `lint:` line, and re-read the output against voice + quality profiles before delivering. If the user said the document is for a wider audience, or asks for a scan, run `bun scripts/spec-prose.ts <spec>` and the hogwash scan exactly as for a shared deck (the block above); a document only the owner will read is not scanned. For .md outputs, image links point at the generated assets - keep them inside `outputs/`.
 
 ## Before calling it done
 
-1. Run idiolect's ordered self-check on the draft (substance, bans, register, mechanics, rhythm, attribution) against the loaded profile. Fix violations, then check again.
-2. Write the file into `outputs/` with a dated, descriptive name.
-3. Log entry (`bun scripts/wiki.ts log compose "<title>"`) + git commit.
-4. If composing produced genuinely new synthesis (a comparison, an argument, a connection not yet in the wiki), file it as a `wiki/syntheses/` page. Routine restatements do not get filed.
+1. Run idiolect's ordered self-check on the draft (substance, bans, register, mechanics, rhythm, attribution) against the loaded profile. Fix violations, then check again. This is the voice; it applies to every piece.
+2. **Share gate, only on request.** If the user said the piece is for a wider audience or asked for a scan, run hogwash on it now (SKILL.md, "Hogwash runs only when asked") and fix or hand over what it reports. If they did not say, deliver the piece and ask in one sentence whether it is going outside; do not scan first.
+3. Write the file into `outputs/` with a dated, descriptive name.
+4. Log entry (`bun scripts/wiki.ts log compose "<title>"`) + git commit.
+5. If composing produced genuinely new synthesis (a comparison, an argument, a connection not yet in the wiki), file it as a `wiki/syntheses/` page. Routine restatements do not get filed.

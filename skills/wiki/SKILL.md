@@ -1,6 +1,6 @@
 ---
 name: wiki
-description: Use when the user wants an agent-maintained knowledge wiki - creating one, ingesting source material (pptx, pdf, docx, markdown, images), asking questions of accumulated knowledge, recomposing it into blogs, LinkedIn posts, slide decks, docx or SVG images, health-checking pages, or building a personal voice profile (captured by the bundled idiolect skill, enforced by the bundled hogwash skill). Also use when a folder contains raw/.ingest-manifest.json or the user mentions "my wiki".
+description: Use when the user wants an agent-maintained knowledge wiki - creating one, ingesting source material (pptx, pdf, docx, markdown, images), asking questions of accumulated knowledge, recomposing it into blogs, LinkedIn posts, slide decks, docx or SVG images, health-checking pages, or building a personal voice profile (captured by the bundled idiolect skill; the bundled hogwash skill scans only pieces the user marks for an outside audience). Also use when a folder contains raw/.ingest-manifest.json or the user mentions "my wiki".
 ---
 
 # Wiki
@@ -24,6 +24,7 @@ Talk in plain language. Run every command yourself; never ask the user to run on
 | "health check", "lint", "anything stale?" | Lint | references/lint.md |
 | "capture my voice", "sounds fake", voice_profile is none | Profile | references/profile.md |
 | "forget this source", "remove that file from the wiki" | Ingest, removed flow | references/ingest.md, "States you will meet" |
+| "scan this", "make it ready to share", "this goes to customers/public" | Share gate (hogwash on one output) | this file, "Hogwash runs only when asked" |
 
 Every wiki carries its own `CLAUDE.md` schema (created at setup). When working inside a wiki, that schema is the local authority; these references explain the machinery behind it.
 
@@ -35,6 +36,7 @@ Every wiki carries its own `CLAUDE.md` schema (created at setup). When working i
 4. **Answers worth keeping get filed** into `wiki/syntheses/` so exploration compounds.
 5. **Every operation that changes files gets a log entry** (`bun scripts/wiki.ts log <op> "<title>"` appends to `wiki/log.jsonl`) and a git commit. A query that only answers gets neither; one that files a synthesis gets both.
 6. **Metadata is queried, never read whole.** `wiki/index.json`, `wiki/map.json` and `wiki/log.jsonl` are machine files that grow with the wiki; `bun scripts/wiki.ts` serves slices of them. Humans get reading copies from `wiki.ts render`.
+7. **Hogwash runs only when the user asks.** The wiki is a private working tool: its pages and most of its outputs are read by the owner alone. Never scan a wiki page. Never scan an ingest. Never scan a composed piece on your own initiative. Scan when the user says a piece is for a wider audience or asks for a scan - see "Hogwash runs only when asked" below.
 
 ## Query mode (inline, no reference file)
 
@@ -60,35 +62,42 @@ All run with `bun`, from the wiki folder (`scripts/` inside each wiki is a self-
 | `compose-docx.ts <spec.json> -o out.docx` | back-compat shim over compose-doc.ts |
 | `verify-pptx.ts <deck.pptx> [spec.json]` | open the rendered deck and report what is really inside it: media per slide, notes, animation, and every image the spec asked for that did not arrive. Exit 2 on a problem |
 | `preview.ts <file> [-o dir] [--pages 1-4]` | turn a .pptx, .pdf, .svg or .gif into PNGs to read back as images. Decks go through LibreOffice or Keynote, the engines that will actually show them |
-| `spec-prose.ts <spec.json> [-o out.md]` | pull the prose out of a deck or doc spec into a markdown file, so hogwash can scan it. Prints a line-number index that reads a finding back as "slide 3 bullet 2". hogwash scans files, and a spec's prose sits in nested JSON no scanner would find |
+| `spec-prose.ts <spec.json> [-o out.md]` | pull the prose out of a deck or doc spec into a markdown file, so hogwash can scan it when the user asks for a scan. Prints a line-number index that reads a finding back as "slide 3 bullet 2". hogwash scans files, and a spec's prose sits in nested JSON no scanner would find |
 
 Spec JSON shapes are documented in the header comments of the two compose scripts.
 
-**Voice linting is hogwash's job.** The bundled hogwash skill scans a draft
-against 900-plus machine-writing rules. The wiki writes no `hogwash.json`:
-hogwash's own defaults apply, and it resolves profile files in the wiki first
-and then under `~/.idiolect/`. Pass `--register prose` for blog, LinkedIn and
-document text; the default `technical` register is calibrated for code-adjacent
-writing. There is no `voice-lint.ts` any more:
+## Hogwash runs only when asked
+
+The wiki produces two kinds of text. **Working text** is for the owner: every
+wiki page, every ingest, and any composed piece they did not say was for someone
+else. It is never scanned; a rough page that says the true thing is worth more
+than a smooth one. **Shared text** is a piece the user says will go to a wider
+audience (customers, a blog, LinkedIn, a deck for a room) or one they ask you to
+scan. That piece, and only that piece, goes through hogwash:
 
 ```bash
-bun .claude/skills/hogwash/scripts/hogwash.ts scan --register prose --fail-on error <draft.md>
+bun scripts/spec-prose.ts outputs/<name>.spec.json      # deck or doc spec only; a .md is scanned as is
+bun .claude/skills/hogwash/scripts/hogwash.ts scan --register prose --fail-on error <file.md>
 ```
 
-`--fail-on error` is what makes a single breach fail the run. Without it the
+`--register prose` calibrates the scanner for published prose rather than code
+comments. `--fail-on error` makes a single breach fail the run; without it the
 exit code is density-based, and one em dash in a long document sits far below
-the threshold.
+the threshold. Fix what it reports, or hand the file to hogwash's rewrite loop
+when the user wants that.
 
-**Everything voice goes through hogwash.** Its rule packs carry the real ban
-list, the machine-writing tells. The idiolect profile adds the owner's own bans
-and voice, and hogwash's rewrite loop applies that profile too (voice, register
-overlay, ban list), so you never run a parallel check. Hogwash finds the profile
-at its default path, `profile/` in the wiki and then `~/.idiolect/profile/`. To
-make that the owner's named profile with no config file, one symlink does it:
-`~/.idiolect/profile -> ~/.idiolect/profiles/<name>`. `bun scripts/doctor.ts`
-reports whether that path resolves. The `mechanics` pack (connector dashes,
-comma counts, paragraph length) is off by default; a wiki that wants it runs
-`hogwash.ts init` itself. Setup never writes a `hogwash.json`.
+When a compose request does not say who the piece is for, do not guess and do
+not scan. Deliver it, and ask in one sentence whether it is going outside. If
+yes, run the share gate then.
+
+Hogwash needs nothing from the wiki. Setup writes no `hogwash.json`; hogwash's
+defaults apply, its rule packs carry the real ban list (the machine-writing
+tells), and the owner's idiolect profile adds their own bans and voice. It reads
+that profile at `profile/` in the wiki, then `~/.idiolect/profile/`; one symlink
+(`~/.idiolect/profile -> ~/.idiolect/profiles/<name>`) makes the named profile
+its default everywhere, and `bun scripts/doctor.ts` reports whether it resolves.
+The idiolect profile itself still governs every composed piece, shared or not:
+it is the voice, and voice is not the same as a scan.
 
 **Existing wiki missing a script?** Re-run the skill's `setup.ts` on it. It refreshes `scripts/` and never touches your content.
 
