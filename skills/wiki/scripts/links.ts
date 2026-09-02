@@ -120,8 +120,17 @@ for (const [rel, e] of Object.entries(m.files)) {
     continue;
   }
   const expected = `wiki/sources/${sourcePageSlug(rel)}.md`;
-  if (!existsSync(join(root, expected)) && !sourcePages.includes(expected))
-    misnamedSource.push({ source: rel, expected, actual: sourcePages[0]! });
+  if (existsSync(join(root, expected)) || sourcePages.includes(expected)) continue;
+  // Docset exception: a folder of many small files (a crawled documentation
+  // tree, an exported manual) is summarised by one page for the whole folder.
+  // That page's slug is a prefix of what this file's own slug would be, so the
+  // name has not drifted - the unit of ingestion is the folder. Not a warning.
+  const isDocsetPage = sourcePages.some((p) => {
+    const slug = basename(p, ".md");
+    return sourcePageSlug(rel).startsWith(`${slug}--`);
+  });
+  if (isDocsetPage) continue;
+  misnamedSource.push({ source: rel, expected, actual: sourcePages[0]! });
 }
 
 // ---- index.json + map.json ---------------------------------------------------

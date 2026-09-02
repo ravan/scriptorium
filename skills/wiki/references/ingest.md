@@ -49,6 +49,20 @@ Two speeds. **Batch** (default): process everything pending, log each. **Slow** 
 
 8. Optional, when the user cares about disk space: `bun scripts/clean.ts` shows what derived/ material of ingested sources can go (gated junk, PDF page renders, unreferenced media); `--apply` deletes it. Everything is regenerable with `bun scripts/ingest.ts --re-extract <file>`.
 
+## Docsets: one folder of many small files
+
+Sometimes `ingest.ts` lists hundreds or thousands of pending markdown files from one folder: a crawled documentation site, an exported manual, a book split into chapters. One source page per file would mirror the publication instead of summarising it, and would spend most of a session's budget on one job. This is not your call to make silently: **stop and ask the human** with two options (one page per product/version folder, or one page per file) and recommend the folder option unless the files are genuinely independent documents.
+
+If the human picks the folder option:
+
+1. Write the exception into the wiki's `CLAUDE.md` under "Wiki page types" (the schema template already carries the wording; copy it and name the folder and the date).
+2. Decide the unit: the top-level product/version folder (`raw/docs/acme/2.0/`). Very small subfolders that belong together (release notes for ten products, one page each) may share one page. A crawl's own `MAP.md` or landing index becomes the hub page that links every docset page.
+3. Per docset, read the landing/index page, skim the section list, then grep the folder for the themes this wiki cares about and read only the hits. Write the page as a **reading guide, not a copy**: purpose line; `Source:` line with folder link and page count; "Full documentation" (raw folder, index file, live URL, a `grep -ril "<term>" <folder>/` one-liner so a later agent can find the exact page); "How the docs are organised" with every section linked to its raw file; claims relevant to the wiki's themes, each linked to the raw page that states it; key facts; related wiki pages. Never summarise a section without a link back to it.
+4. Independent docsets can be written in parallel by helper agents given the same written brief; you keep the hub page, the manifest, the log and the commit.
+5. Mark every file in the folder ingested against its docset page in one call per docset (`bun scripts/manifest.ts mark-ingested <files...> --pages <docset page>,<hub page>`; the script takes many files at once). Log one `ingest` entry per docset page, not per file. Run `links.ts`, commit once.
+
+Querying later: start at the docset page, follow its links into `raw/`, or grep the folder. Never read a whole docset.
+
 ## States you will meet
 
 - `extracted` - script done, your ingest pending (`bun scripts/manifest.ts pending` lists these).
