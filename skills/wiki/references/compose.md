@@ -122,7 +122,7 @@ settle the mechanical half, in this order:
 
 ```bash
 bun scripts/spec-prose.ts outputs/<name>.spec.json          # the words, step 1
-bun .claude/skills/hogwash/scripts/hogwash.ts scan --fail-on error outputs/<name>.spec.prose.md
+bun .claude/skills/hogwash/scripts/hogwash.ts scan --register prose --fail-on error outputs/<name>.spec.prose.md
 bun scripts/verify-pptx.ts outputs/<name>.pptx outputs/<name>.spec.json   # the file
 bun scripts/preview.ts outputs/<name>.pptx -o /tmp/preview  # the slides
 ```
@@ -130,13 +130,16 @@ bun scripts/preview.ts outputs/<name>.pptx -o /tmp/preview  # the slides
 - **`spec-prose.ts` then hogwash** settle the words. hogwash scans files, and a
   spec's prose sits in nested JSON no scanner would find, so `spec-prose.ts`
   writes it out as markdown first and prints a line-number index that reads a
-  finding back as "slide 3 bullet 2". It catches captions and bullets, which is
-  where a hand check misses things. hogwash brings the machine-writing rules and
-  the ban list; the wiki's `hogwash.json` adds the `mechanics` pack for connector
-  dashes, sentences over one comma, and paragraphs past three sentences.
-  `--fail-on error` is what makes one breach fail the run, because the plain exit
-  code is density-based and a single dash in a long deck sits under the
-  threshold.
+  finding back as "slide 3 bullet 2" or "section 4 block 2". It reads both spec
+  shapes, slides and document `blocks`, so captions, bullets and body paragraphs
+  all arrive, which is where a hand check misses things. hogwash runs on its
+  defaults (the wiki writes no `hogwash.json`); `--register prose` calibrates it
+  for published prose rather than code comments, and `--fail-on error` is what
+  makes one breach fail the run, because the plain exit code is density-based
+  and a single dash in a long deck sits under the threshold. Hogwash's packs
+  are the real ban list; the idiolect profile at hogwash's default `profile/`
+  path adds the owner's bans and voice, and hogwash's rewrite loop applies them
+  (see references/profile.md).
 - **`verify-pptx.ts`** opens the deck and reports media per slide, whether notes
   arrived, whether an animation kept its frames, and any image the spec asked for
   that is not there. It also warns when a visual fills far less of its slot than
@@ -158,7 +161,7 @@ to its claim, and whether a slide earns its place are still yours.
 
 Long-form artifacts use the same machinery as slides: a template folder owns the look, a spec JSON owns the content, one script renders it - `bun scripts/compose-doc.ts <spec> -o outputs/<name>.md|.docx|.pdf` (spec shape in the script header). Same output from the same spec in all three formats; .pdf needs Chrome/Chromium on the machine (doctor.ts checks), .md and .docx need nothing.
 
-**A doc template is a document TYPE, not just a skin.** Each folder under `templates/docs/` carries `template.json` (fonts, colors, page, cover, and *rules*: word range, bullet policy, figure density) and `structure.md` (the section skeleton and writing rules for that form). Shipped: `whitepaper`, `pov` (point of view), `amazon-6pager`. Users tweak these or add their own folders; treat a user-added template's structure.md as law, same as a shipped one.
+**A doc template is a document TYPE, not just a skin.** Each folder under `templates/docs/` carries `template.json` (fonts, colors, page, cover, and *rules*: word range, bullet policy, figure density) and `structure.md` (the section skeleton and writing rules for that form). Shipped: `whitepaper`, `pov` (point of view), `amazon-6pager`. Users tweak these or add their own folders; a re-run of setup keeps a tweaked file (only `--refresh-templates` overwrites it). Treat a user-added template's structure.md as law, same as a shipped one.
 
 Composing a document:
 
@@ -166,7 +169,7 @@ Composing a document:
 2. **Read the template's `structure.md` first** and build the spec's sections to its skeleton. The rules in template.json are enforced by lint; structure.md is enforced by you.
 3. Facts from wiki pages only; cite raw sources in a references section where the form has one.
 4. Visuals follow "Visuals" above: a Lolly render for any shape a tool covers, annotated by you where the figure needs saying more, your own SVG for bespoke structure. Figure density is linted per template - a document under its figure count is usually one that explained in prose what a chart would have shown.
-5. Render, fix every `lint:` line, and re-read the output against voice + quality profiles before delivering. For .md outputs, image links point at the generated assets - keep them inside `outputs/`.
+5. Render, fix every `lint:` line, then `bun scripts/spec-prose.ts <spec>` and the hogwash scan exactly as for a deck (the "Before you call a deck done" block above); re-read the output against voice + quality profiles before delivering. For .md outputs, image links point at the generated assets - keep them inside `outputs/`.
 
 ## Before calling it done
 

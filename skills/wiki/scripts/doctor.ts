@@ -115,6 +115,35 @@ for (const r of results) {
   console.log(`${mark}  ${r.cmd}  (${r.why})${r.found ? "" : `\n         install with: ${r.install}`}`);
 }
 
+// Voice profiles are not a tool, so they are reported, not scored. Shown
+// because hogwash and idiolect resolve "~" through $HOME: a session that runs
+// with a different HOME (an agent profile, a container) will not see the
+// profiles the user built, and a scan then fails with a missing ban list.
+{
+  const { existsSync, readdirSync } = require("node:fs");
+  const { join } = require("node:path");
+  const home = process.env.HOME ?? "";
+  const dir = join(home, ".idiolect", "profiles");
+  const names: string[] = existsSync(dir)
+    ? readdirSync(dir).filter((n: string) => !n.startsWith(".") && existsSync(join(dir, n, "voice.md")))
+    : [];
+  console.log(
+    `\nvoice profiles under ~/.idiolect/profiles (HOME=${home}): ${names.length ? names.join(", ") : "none yet - the idiolect skill builds one"}`,
+  );
+  // Hogwash reads its profile at `profile/` (project, then ~/.idiolect) when
+  // there is no hogwash.json. That is where the owner's voice has to be for
+  // every voice check to go through hogwash alone.
+  const local = join(process.cwd(), "profile", "ban-list.md");
+  const shared = join(home, ".idiolect", "profile", "ban-list.md");
+  const at = existsSync(local) ? "profile/ (this folder)" : existsSync(shared) ? "~/.idiolect/profile/" : null;
+  console.log(
+    at
+      ? `hogwash default profile: resolves at ${at}`
+      : `hogwash default profile: nothing at profile/ or ~/.idiolect/profile/ - scans run without the owner's bans.` +
+          (names.length ? ` Point it at a profile: ln -s ~/.idiolect/profiles/${names[0]} ~/.idiolect/profile` : ""),
+  );
+}
+
 if (missing.length === 0) {
   console.log("\nAll tools are ready.");
 } else {

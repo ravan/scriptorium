@@ -116,9 +116,20 @@ switch (cmd) {
     const data = map();
     const pagesByPath = new Map(idx().pages.map((p) => [p.path, p]));
     const want = arg.replace(/\.md$/, "").toLowerCase();
-    const i = data.nodes.findIndex(
-      (n) => n.path === arg || basename(n.path, ".md").toLowerCase() === basename(want),
-    );
+    let i = data.nodes.findIndex((n) => n.path === arg || n.path === `${arg}.md`);
+    if (i < 0) {
+      // A bare slug can exist in more than one folder (topics/x and entities/x).
+      // Picking the first in silence would answer about the wrong page.
+      const matches = data.nodes
+        .map((n, j) => [n, j] as const)
+        .filter(([n]) => basename(n.path, ".md").toLowerCase() === basename(want));
+      if (matches.length > 1) {
+        console.error(`"${arg}" names ${matches.length} pages. Pass the full path:`);
+        for (const [n] of matches) console.error(`  ${n.path}`);
+        process.exit(1);
+      }
+      i = matches[0]?.[1] ?? -1;
+    }
     if (i < 0) {
       console.error(`No page matches "${arg}". Try: bun wiki.ts find ${arg}`);
       process.exit(1);

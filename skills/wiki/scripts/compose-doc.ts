@@ -147,6 +147,15 @@ async function specImage(rel: string): Promise<string> {
   if (!existsSync(abs)) throw new Error("image not found: " + abs);
   return rasterize(abs);
 }
+// The docx library wants to be told the image type; labelling a JPEG "png"
+// is not something every Word build forgives.
+function docxImageType(path: string): "png" | "jpg" | "gif" | "bmp" {
+  const ext = path.toLowerCase().replace(/^.*\./, "");
+  if (ext === "jpg" || ext === "jpeg") return "jpg";
+  if (ext === "gif") return "gif";
+  if (ext === "bmp") return "bmp";
+  return "png"; // png, and every rasterized svg
+}
 async function templateAsset(key: string, widthPx = 800): Promise<string | null> {
   const rel = tpl.assets[key];
   if (!rel) return null;
@@ -228,7 +237,7 @@ async function renderDocx(): Promise<Uint8Array> {
       const bytes = await Bun.file(logo).bytes();
       const m = await new (Bun as any).Image(bytes).metadata();
       const w = 170;
-      children.push(new Paragraph({ spacing: { before: 1200, after: 2400 }, children: [new ImageRun({ type: "png", data: bytes, transformation: { width: w, height: Math.round((w * m.height) / m.width) } })] }));
+      children.push(new Paragraph({ spacing: { before: 1200, after: 2400 }, children: [new ImageRun({ type: docxImageType(logo), data: bytes, transformation: { width: w, height: Math.round((w * m.height) / m.width) } })] }));
     }
     children.push(para(spec.title ?? "Untitled", { size: 56, bold: true, color: C.heading }));
     if (spec.subtitle) children.push(para(spec.subtitle, { size: 28, color: C.text }));
@@ -272,7 +281,7 @@ async function renderDocx(): Promise<Uint8Array> {
         const bytes = await Bun.file(p).bytes();
         const m = await new (Bun as any).Image(bytes).metadata();
         const w = Math.min(600, m.width);
-        children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 160, after: 80 }, children: [new ImageRun({ type: "png", data: bytes, transformation: { width: w, height: Math.round((w * m.height) / m.width) } })] }));
+        children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 160, after: 80 }, children: [new ImageRun({ type: docxImageType(p), data: bytes, transformation: { width: w, height: Math.round((w * m.height) / m.width) } })] }));
         if (b.caption) children.push(para(b.caption, { size: 18, italic: true, color: C.muted, align: AlignmentType.CENTER }));
       } else if (b.type === "pagebreak") children.push(new Paragraph({ children: [new PageBreak()] }));
     }

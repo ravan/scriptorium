@@ -87,7 +87,7 @@ Composed outputs are governed by a voice profile in `profiles/<name>/`, created 
 
 A profile is a folder: `voice.md` (how you sound), `quality.md` (what "good" means per format), `ban-list.md` (words you forbid), `registers/` (per-format overlays: blog, LinkedIn, whitepaper, talk), plus an evidence ledger and a changelog. A wiki can hold several named voices.
 
-Say *"capture my voice"*. Idiolect builds the profile from writing you point it at, or through its guided interview when you have no samples, and it refines the profile every time you react to a piece ("I'd never say that"). The bundled hogwash skill enforces the ban list mechanically on every composed draft, alongside its own machine-writing rules and the house mechanics the wiki turns on: connector dashes, sentences over one comma, paragraphs past three sentences.
+Say *"capture my voice"*. Idiolect builds the profile from writing you point it at, or through its guided interview when you have no samples, and it refines the profile every time you react to a piece ("I'd never say that"). A profile can also live user-wide in `~/.idiolect/profiles/<name>/`, shared by every project. Everything voice goes through the bundled hogwash skill, on its own defaults; the wiki writes no `hogwash.json`. Hogwash's rule packs are the real ban list (the machine-writing tells); the idiolect profile adds your own bans and voice, and hogwash's rewrite loop applies it from its default `profile/` path, so one symlink (`~/.idiolect/profile -> ~/.idiolect/profiles/<name>`) makes your voice the default in every project.
 
 ## Everything visual comes from a template folder you can edit
 
@@ -161,7 +161,7 @@ All of them run with [bun](https://bun.sh) from the wiki folder. Each wiki carri
 | Script | Job |
 |---|---|
 | `doctor.ts` | Check required tools and print plain-language install hints |
-| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>]` | Scaffold or repair a wiki. Idempotent, never overwrites your content, refreshes `scripts/` and skill-shipped templates |
+| `setup.ts <dir> --name "X" [--brand <skill>] [--slide-template <name>] [--voice-profile <name>] [--refresh-templates] [--refresh-schema]` | Scaffold or repair a wiki. Idempotent, never overwrites your content. A re-run refreshes `scripts/`, adds new templates but keeps template files you edited (`--refresh-templates` overwrites them), updates a `CLAUDE.md` config line per flag, and commits only what it changed |
 | `ingest.ts [--dry-run]` | Scan `raw/`, update the manifest, extract to `derived/` |
 | `manifest.ts status\|pending\|mark-ingested` | Inspect and update ingest state |
 | `compose-pptx.ts <spec.json> -o out.pptx` | Render a slide spec through a `templates/slides/` template and lint it |

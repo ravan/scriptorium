@@ -17,7 +17,10 @@
 // only noise the reader learns to skip.
 //
 // Then:
-//   bun .claude/skills/hogwash/scripts/hogwash.ts scan --fail-on error <out.md>
+//   bun .claude/skills/hogwash/scripts/hogwash.ts scan --register prose --fail-on error <out.md>
+//
+// Both spec shapes are read: slides (compose-pptx.ts) and sections with
+// `blocks` (compose-doc.ts), plus the legacy per-section paragraphs/bullets.
 //
 // Exit codes: 0 written, 1 usage or no prose found.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -65,7 +68,35 @@ export function textsFromSpec(spec: any): SpecText[] {
     spec.sections.forEach((s: any, i: number) => {
       const n = i + 1;
       for (const f of ["heading", "body", "text", "caption"]) push(`section ${n} ${f}`, s?.[f]);
+      // Legacy per-section keys.
       (s?.paragraphs ?? []).forEach((p: any, j: number) => push(`section ${n} para ${j + 1}`, p));
+      (s?.bullets ?? []).forEach((b: any, j: number) => push(`section ${n} bullet ${j + 1}`, b));
+      push(`section ${n} callout`, s?.callout);
+      push(`section ${n} caption`, s?.image?.caption);
+      // Current shape: compose-doc.ts reads `blocks`. A "p" block is body copy
+      // and is labelled so isBodyCopy() measures it as a paragraph.
+      (s?.blocks ?? []).forEach((b: any, k: number) => {
+        const at = `section ${n} block ${k + 1}`;
+        switch (b?.type) {
+          case "p":
+            push(`${at} body`, b.text);
+            break;
+          case "callout":
+            push(`${at} callout`, b.text);
+            break;
+          case "quote":
+            push(`${at} quote`, b.text);
+            push(`${at} attribution`, b.attribution);
+            break;
+          case "bullets":
+          case "numbered":
+            (b.items ?? []).forEach((it: any, j: number) => push(`${at} item ${j + 1}`, it));
+            break;
+          case "image":
+            push(`${at} caption`, b.caption);
+            break;
+        }
+      });
     });
   }
 
@@ -143,6 +174,6 @@ if (import.meta.main) {
   console.log(out);
   for (const entry of index) console.log(`  line ${entry.line}: ${entry.where}`);
   console.log(
-    `\nNow scan it:\n  bun .claude/skills/hogwash/scripts/hogwash.ts scan --fail-on error ${out}`,
+    `\nNow scan it:\n  bun .claude/skills/hogwash/scripts/hogwash.ts scan --register prose --fail-on error ${out}`,
   );
 }

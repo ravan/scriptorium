@@ -74,6 +74,23 @@ function paragraphsFrom(xml: string, paraClose: RegExp, runRe: RegExp): string[]
   return out;
 }
 
+// Word paragraphs, with heading styles turned into markdown headings so the
+// outline has a map to slice by. Without this a 300-paragraph report is one
+// flat span and outline.ts can only cut it evenly.
+function docxParagraphs(xml: string): string[] {
+  const out: string[] = [];
+  for (const chunk of xml.split(/<\/w:p>/)) {
+    const text = [...chunk.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => decodeXmlEntities(m[1])).join("").trim();
+    if (!text) continue;
+    const style = chunk.match(/<w:pStyle w:val="([^"]+)"/)?.[1] ?? "";
+    // "Heading1", "Heading 2", "heading3"; "Title" sits above them.
+    const level = /^title$/i.test(style) ? 1 : /^heading\s?([1-6])$/i.exec(style)?.[1];
+    if (level) out.push(`${"#".repeat(Number(level) + 1)} ${text}`);
+    else out.push(text);
+  }
+  return out;
+}
+
 function unzipTo(src: string, dest: string): boolean {
   mkdirSync(dest, { recursive: true });
   return run(["unzip", "-o", "-q", src, "-d", dest]).ok;
@@ -139,7 +156,7 @@ async function extractDocx(src: string, outDir: string): Promise<string> {
   const tmp = join(outDir, ".unzip-tmp");
   if (!unzipTo(src, tmp)) throw new Error("unzip failed for " + src);
   const xml = await Bun.file(join(tmp, "word", "document.xml")).text();
-  const paras = paragraphsFrom(xml, /<\/w:p>/, /<w:t[^>]*>([^<]*)<\/w:t>/g);
+  const paras = docxParagraphs(xml);
   copyMedia(join(tmp, "word", "media"), join(outDir, "media"));
   rmSync(tmp, { recursive: true, force: true });
   const gate = await gateMediaDir(join(outDir, "media"), "media/", new Map());
@@ -157,7 +174,12 @@ async function extractPdf(src: string, outDir: string): Promise<string> {
     if (!have(tool)) throw new Error(`${tool} is missing. Install with: brew install poppler`);
   }
   mkdirSync(outDir, { recursive: true });
-  run(["pdftotext", "-layout", src, join(outDir, "text.txt")]);
+  const textPath = join(outDir, "text.txt");
+  const text = run(["pdftotext", "-layout", src, textPath]);
+  if (!text.ok) throw new Error(`pdftotext failed (locked or damaged PDF?): ${text.stderr.trim().split("\n")[0] ?? ""}`);
+  // A scanned PDF has no text layer. pdftotext then succeeds and writes form
+  // feeds and whitespace, which reads as "empty" only if someone looks.
+  const textChars = existsSync(textPath) ? (await Bun.file(textPath).text()).replace(/\s|\f/g, "").length : 0;
   const mediaDir = join(outDir, "media");
   mkdirSync(mediaDir, { recursive: true });
   run(["pdfimages", "-png", src, join(mediaDir, "img")]);
@@ -173,7 +195,10 @@ async function extractPdf(src: string, outDir: string): Promise<string> {
   const pagesGate = await gateMediaDir(pagesDir, "pages/", seen);
   const skipped = [...mediaGate.skipped, ...pagesGate.skipped];
   writeSkippedJson(outDir, skipped);
-  return `${pages} pages, ${mediaGate.kept.length} embedded images${capNote}${junkNote(skipped)}`;
+  const scanNote = textChars < 40 * Math.max(1, pages)
+    ? ` - NO TEXT LAYER (scanned?): text.txt is empty, read the pages/ renders instead`
+    : "";
+  return `${pages} pages, ${mediaGate.kept.length} embedded images${capNote}${junkNote(skipped)}${scanNote}`;
 }
 
 // ---------- main ----------

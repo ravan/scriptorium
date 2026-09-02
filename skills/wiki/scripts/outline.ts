@@ -3,8 +3,8 @@
 // instead of cat-ing it and blowing the output limit.
 //
 // Usage:
-//   bun outline.ts                 # every source still pending ingest
-//   bun outline.ts <slug|path...>  # named derived slugs or any text file
+//   bun outline.ts                 # every source still pending ingest (raw .md/.txt included)
+//   bun outline.ts <slug|path...>  # named derived slugs, raw-relative paths, or any text file
 //   bun outline.ts --all           # every source in the manifest
 //
 // Prints, per file: size, line count, a read plan, and a heading map with line ranges.
@@ -13,8 +13,9 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { loadManifest, slugFor, wikiRootOrDie } from "./common";
 
-// Bash tool output starts truncating well before this; ~12k chars is a safe slice.
-const SAFE_CHARS = 12_000;
+// Bash tool output starts truncating well before this; ~12 KB is a safe slice.
+// Measured in UTF-8 bytes, which is what the pipe carries (see sliceChars).
+const SAFE_BYTES = 12_000;
 
 interface Heading {
   line: number; // 1-indexed
@@ -180,16 +181,16 @@ function report(root: string, absPath: string): void {
   console.log(`\n## ${rel}`);
   console.log(`  ${bytes.toLocaleString()} bytes · ${lines.length} lines`);
 
-  if (bytes <= SAFE_CHARS) {
+  if (bytes <= SAFE_BYTES) {
     console.log(`  Small enough to read whole:  cat ${rel}`);
     return;
   }
 
   console.log(`  Too big to cat. Read it in the slices below.`);
 
-  const cuts = planSlices(lines, SAFE_CHARS);
+  const cuts = planSlices(lines, SAFE_BYTES);
 
-  console.log(`\n  Read plan (${cuts.length} slices, each under ${SAFE_CHARS.toLocaleString()} chars):`);
+  console.log(`\n  Read plan (${cuts.length} slices, each under ${SAFE_BYTES.toLocaleString()} bytes):`);
   const cmds = cuts.map((c) => `sed -n '${c.from},${c.to}p' ${rel}`);
   const width = Math.max(...cmds.map((c) => c.length));
   for (let i = 0; i < cuts.length; i++) {
@@ -207,6 +208,8 @@ function report(root: string, absPath: string): void {
 // ---- resolve what to inspect -------------------------------------------------
 // Guarded so `import { planSlices } from "./outline"` in tests does not run the CLI.
 if (import.meta.main) {
+// Source types ingest.ts leaves in raw/ with no extraction step.
+const READ_RAW = new Set(["markdown", "text"]);
 const args = process.argv.slice(2).filter((a) => a !== "--all");
 const wantAll = process.argv.includes("--all");
 const root = wikiRootOrDie();
@@ -222,17 +225,30 @@ if (args.length) {
       continue;
     }
     // Treat as a derived slug or a raw-relative path.
-    const slug = m.files[a] ? slugFor(a) : a;
-    const dir = join(root, "derived", slug);
-    for (const f of ["text.md", "text.txt"]) {
-      if (existsSync(join(dir, f))) targets.push(join(dir, f));
+    const before = targets.length;
+    const entry = m.files[a];
+    if (entry && !entry.derived && READ_RAW.has(entry.type)) {
+      // Markdown and text sources have no derived/ copy; the raw file is the text.
+      const p = join(root, "raw", a);
+      if (existsSync(p)) targets.push(p);
+    } else {
+      const slug = entry ? slugFor(a) : a;
+      const dir = join(root, "derived", slug);
+      for (const f of ["text.md", "text.txt"]) {
+        if (existsSync(join(dir, f))) targets.push(join(dir, f));
+      }
     }
-    if (!targets.length) console.error(`no derived text found for: ${a}`);
+    if (targets.length === before) console.error(`no text found for: ${a}`);
   }
 } else {
-  for (const e of Object.values(m.files)) {
+  for (const [rel, e] of Object.entries(m.files)) {
     if (!wantAll && e.status !== "extracted") continue;
-    if (!e.derived) continue;
+    if (!e.derived) {
+      // A raw .md or .txt is read directly, and a long one truncates under
+      // `cat` exactly like extracted text does. It gets a read plan too.
+      if (READ_RAW.has(e.type) && existsSync(join(root, "raw", rel))) targets.push(join(root, "raw", rel));
+      continue;
+    }
     for (const f of ["text.md", "text.txt"]) {
       const p = join(root, e.derived, f);
       if (existsSync(p)) targets.push(p);
@@ -249,7 +265,7 @@ if (!targets.length) {
   process.exit(0);
 }
 
-console.log(`Outlining ${targets.length} file(s). Slice budget: ${SAFE_CHARS.toLocaleString()} chars.`);
+console.log(`Outlining ${targets.length} file(s). Slice budget: ${SAFE_BYTES.toLocaleString()} bytes.`);
 for (const t of targets) report(root, t);
 console.log("");
 }

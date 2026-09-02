@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 // Checks the wiki's own wiring: broken relative links, wikilink syntax, orphan pages,
-// pages the manifest claims exist but do not, and pages missing their purpose line.
+// pages the manifest claims exist but do not, pages missing their purpose line,
+// link targets with unencoded spaces, and source pages not at the schema name.
 // Also regenerates the machine-readable catalog and graph:
 //
 //   wiki/index.json - every page: path, category, title (H1), summary (the page's
@@ -19,7 +20,7 @@
 // Exit code 1 when anything is broken, so it can gate a commit.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { loadManifest, wikiRootOrDie } from "./common";
+import { loadManifest, markdownLinks, sourcePageSlug, wikiRootOrDie } from "./common";
 
 const root = wikiRootOrDie();
 const quiet = process.argv.includes("--quiet");
@@ -58,11 +59,10 @@ interface Broken {
 
 const broken: Broken[] = [];
 const wikilinks: Broken[] = [];
+const spaced: Broken[] = []; // targets with an unencoded space: not a link in strict markdown
 const linkedTo = new Set<string>(); // absolute paths of wiki pages that something links to
 const edges: Array<[string, string]> = []; // directed page -> page links
 
-// Markdown inline links and images: [text](target) / ![alt](target)
-const LINK = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 const WIKILINK = /\[\[([^\]]+)\]\]/g;
 
 for (const page of pages) {
@@ -76,15 +76,17 @@ for (const page of pages) {
       wikilinks.push({ page, target: m[1]!, line: i + 1, why: "wikilink syntax; use a relative markdown link" });
     }
 
-    for (const m of line.matchAll(LINK)) {
-      const raw = m[1]!;
-      if (/^(https?:|mailto:|#)/.test(raw)) continue;
-      const target = decodeURI(raw.split("#")[0]!);
-      if (!target) continue;
-      const abs = resolve(dirname(page), target);
+    for (const link of markdownLinks(line)) {
+      if (link.external || !link.target) continue;
+      const abs = resolve(dirname(page), link.target);
       if (!existsSync(abs)) {
-        broken.push({ page, target: raw, line: i + 1, why: "target does not exist" });
-      } else if (abs.startsWith(wikiDir) && abs.endsWith(".md") && !isLegacyMeta(abs)) {
+        broken.push({ page, target: link.raw, line: i + 1, why: "target does not exist" });
+        continue;
+      }
+      // Raw file names carry spaces all the time. The old matcher stopped at
+      // the space and never saw the link, so it could not report it.
+      if (link.hasSpace) spaced.push({ page, target: link.raw, line: i + 1, why: "space in link target" });
+      if (abs.startsWith(wikiDir) && abs.endsWith(".md") && !isLegacyMeta(abs)) {
         linkedTo.add(abs);
         edges.push([page, abs]);
       }
@@ -107,10 +109,19 @@ for (const [rel, e] of Object.entries(m.files)) {
 
 // Sources marked ingested that have no source page at all.
 const noSourcePage: string[] = [];
+// Sources whose page exists but not under the schema's name (folders joined
+// with "--", extension dropped). A warning: the page works, the convention drifted.
+const misnamedSource: Array<{ source: string; expected: string; actual: string }> = [];
 for (const [rel, e] of Object.entries(m.files)) {
   if (e.status !== "ingested") continue;
-  const has = (e.pagesTouched ?? []).some((p) => p.startsWith("wiki/sources/") && existsSync(join(root, p)));
-  if (!has) noSourcePage.push(rel);
+  const sourcePages = (e.pagesTouched ?? []).filter((p) => p.startsWith("wiki/sources/") && existsSync(join(root, p)));
+  if (!sourcePages.length) {
+    noSourcePage.push(rel);
+    continue;
+  }
+  const expected = `wiki/sources/${sourcePageSlug(rel)}.md`;
+  if (!existsSync(join(root, expected)) && !sourcePages.includes(expected))
+    misnamedSource.push({ source: rel, expected, actual: sourcePages[0]! });
 }
 
 // ---- index.json + map.json ---------------------------------------------------
@@ -228,9 +239,10 @@ writeFileSync(join(wikiDir, "map.json"), JSON.stringify(mapJson, null, 2) + "\n"
 
 // ---- report -------------------------------------------------------------------
 
-const problems = broken.length + wikilinks.length + missingTouched.length + noSourcePage.length;
+const problems = broken.length + wikilinks.length + spaced.length + missingTouched.length + noSourcePage.length;
+const warnings = orphans.length + noPurpose.length + misnamedSource.length;
 
-if (quiet && problems === 0 && orphans.length === 0 && noPurpose.length === 0) process.exit(0);
+if (quiet && problems === 0 && warnings === 0) process.exit(0);
 
 console.log(
   `Checked ${pages.length} wiki page(s). Regenerated wiki/index.json and wiki/map.json (${directed.length} links, ${clusterList.length} cluster(s)).`,
@@ -251,10 +263,18 @@ show(
   wikilinks.map((b) => `${relRoot(b.page)}:${b.line}  ->  [[${b.target}]]`),
 );
 show(
+  "Space in link target (strict markdown drops the link; write %20 for each space, or wrap the target in <...>)",
+  spaced.map((b) => `${relRoot(b.page)}:${b.line}  ->  ${b.target}`),
+);
+show(
   "Manifest points at pages that do not exist",
   missingTouched.map((x) => `${x.source}  ->  ${x.page}`),
 );
 show("Marked ingested but has no source page", noSourcePage);
+show(
+  "Source page not at the schema's name (folders joined with --, extension dropped); rename or leave, but know which",
+  misnamedSource.map((x) => `${x.source}  ->  have ${x.actual}, expected ${x.expected}`),
+);
 show(
   "Orphan pages (no other page links to them)",
   orphans.map((p) => relRoot(p)),

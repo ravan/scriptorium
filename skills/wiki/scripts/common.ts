@@ -68,6 +68,45 @@ export function slugFor(relPath: string): string {
   return relPath.replaceAll("/", "__");
 }
 
+// The wiki page for a raw source: "papers/whitepaper.docx" -> "papers--whitepaper".
+// Folders join with "--" and the extension drops, so two same-named files in
+// different folders never collide. links.ts checks pages against this.
+export function sourcePageSlug(relPath: string): string {
+  return relPath.replace(/\.[^./]+$/, "").replaceAll("/", "--");
+}
+
+export interface MarkdownLink {
+  raw: string; // the target exactly as written, angle brackets stripped
+  target: string; // decoded path with any #fragment removed
+  hasSpace: boolean; // an unencoded space: strict markdown will not treat this as a link
+  external: boolean; // http(s), mailto or a pure fragment
+}
+
+// Inline links and images on one line: [text](target "title") / ![alt](<target with spaces>).
+// Spaces inside the target are matched on purpose. Strict markdown does not
+// accept them, but people write them, and a regex that stopped at the first
+// space would skip such a link in silence instead of reporting it.
+const MD_LINK = /!?\[[^\]]*\]\(\s*(<[^>]*>|[^)]*?)(?:\s+"[^"]*")?\s*\)/g;
+
+export function markdownLinks(line: string): MarkdownLink[] {
+  const out: MarkdownLink[] = [];
+  for (const m of line.matchAll(MD_LINK)) {
+    let raw = m[1]!.trim();
+    const bracketed = raw.startsWith("<") && raw.endsWith(">");
+    if (bracketed) raw = raw.slice(1, -1);
+    if (!raw) continue;
+    const external = /^(https?:|mailto:|#)/.test(raw);
+    let target = raw.split("#")[0]!;
+    try {
+      target = decodeURI(target);
+    } catch {
+      /* a stray % is still a path; check it as written */
+    }
+    out.push({ raw, target, hasSpace: !bracketed && /\s/.test(raw), external });
+  }
+  return out;
+}
+
 export function decodeXmlEntities(s: string): string {
   return s
     .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))

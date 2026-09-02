@@ -53,6 +53,41 @@ describe("textsFromSpec", () => {
     ]);
   });
 
+  test("REGRESSION: reads the blocks a compose-doc.ts spec actually uses", () => {
+    // The whitepaper in the test wiki carried 1,369 words of body copy in `p`
+    // blocks and only its headings ever reached hogwash.
+    const pieces = textsFromSpec({
+      sections: [
+        {
+          heading: "The problem",
+          blocks: [
+            { type: "p", text: "Prose one." },
+            { type: "bullets", items: ["a", "b"] },
+            { type: "numbered", items: ["first"] },
+            { type: "callout", text: "Remember this." },
+            { type: "quote", text: "Said so.", attribution: "Someone" },
+            { type: "image", path: "x.svg", caption: "a figure" },
+            { type: "pagebreak" },
+          ],
+        },
+      ],
+    });
+    expect(pieces).toEqual([
+      { where: "section 1 heading", text: "The problem" },
+      { where: "section 1 block 1 body", text: "Prose one." },
+      { where: "section 1 block 2 item 1", text: "a" },
+      { where: "section 1 block 2 item 2", text: "b" },
+      { where: "section 1 block 3 item 1", text: "first" },
+      { where: "section 1 block 4 callout", text: "Remember this." },
+      { where: "section 1 block 5 quote", text: "Said so." },
+      { where: "section 1 block 5 attribution", text: "Someone" },
+      { where: "section 1 block 6 caption", text: "a figure" },
+    ]);
+    // Body copy in a block is measured as a paragraph, like the legacy shape.
+    expect(isBodyCopy("section 1 block 1 body")).toBe(true);
+    expect(isBodyCopy("section 1 block 2 item 1")).toBe(false);
+  });
+
   test("leaves a bare number alone, because it is not prose", () => {
     expect(textsFromSpec({ slides: [{ title: "42", subtitle: "12.5%" }] })).toEqual([]);
   });

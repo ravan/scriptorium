@@ -19,7 +19,7 @@
 //   bun scripts/ingest.ts --re-extract <raw-rel-path>
 import { existsSync, readFileSync, readdirSync, rmdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { loadManifest, wikiRootOrDie } from "./common";
+import { loadManifest, markdownLinks, wikiRootOrDie } from "./common";
 
 const apply = process.argv.includes("--apply");
 const root = wikiRootOrDie();
@@ -39,14 +39,14 @@ function walkMd(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const LINK = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 const referenced = new Set<string>(); // absolute paths under derived/ that wiki pages link to
 for (const page of walkMd(wikiDir)) {
-  for (const mm of readFileSync(page, "utf8").matchAll(LINK)) {
-    const raw = mm[1]!;
-    if (/^(https?:|mailto:|#)/.test(raw)) continue;
-    const abs = resolve(dirname(page), decodeURI(raw.split("#")[0]!));
-    if (abs.startsWith(derivedDir + "/")) referenced.add(abs);
+  for (const l of readFileSync(page, "utf8").split("\n")) {
+    for (const link of markdownLinks(l)) {
+      if (link.external || !link.target) continue;
+      const abs = resolve(dirname(page), link.target);
+      if (abs.startsWith(derivedDir + "/")) referenced.add(abs);
+    }
   }
 }
 
